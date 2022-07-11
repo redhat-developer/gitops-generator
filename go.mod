@@ -1,4 +1,4 @@
-module github.com/keithchong/gitops-generator
+module github.com/redhat-developer/gitops-generator
 
 go 1.18
 

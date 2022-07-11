@@ -16,18 +16,18 @@
 package gitops
 
 import (
-	gitopsv1alpha1 "github.com/keithchong/gitops-generator/api/v1alpha1"
+	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"path/filepath"
 
-	"github.com/keithchong/gitops-generator/pkg/resources"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/redhat-developer/gitops-generator/pkg/resources"
 	"github.com/spf13/afero"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	yaml "github.com/keithchong/gitops-generator/pkg/yaml"
+	yaml "github.com/redhat-developer/gitops-generator/pkg/yaml"
 )
 
 const (

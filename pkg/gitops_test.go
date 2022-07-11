@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	gitopsv1alpha1 "github.com/keithchong/gitops-generator/api/v1alpha1"
-	"github.com/keithchong/gitops-generator/pkg/testutils"
-	"github.com/keithchong/gitops-generator/pkg/util/ioutils"
+	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
+	"github.com/redhat-developer/gitops-generator/pkg/testutils"
+	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -597,7 +597,7 @@ func TestGenerateAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
-			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false)
+			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false, "KAM CLI")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)

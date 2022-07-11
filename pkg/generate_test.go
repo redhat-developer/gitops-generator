@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	gitopsv1alpha1 "github.com/keithchong/gitops-generator/api/v1alpha1"
-	"github.com/keithchong/gitops-generator/pkg/resources"
-	"github.com/keithchong/gitops-generator/pkg/util/ioutils"
 	routev1 "github.com/openshift/api/route/v1"
+	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
+	"github.com/redhat-developer/gitops-generator/pkg/resources"
+	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

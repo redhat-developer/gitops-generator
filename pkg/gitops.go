@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitopsv1alpha1 "github.com/keithchong/gitops-generator/api/v1alpha1"
+	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/spf13/afero"
 	corev1 "k8s.io/api/core/v1"
 )
