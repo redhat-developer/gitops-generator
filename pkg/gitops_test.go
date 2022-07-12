@@ -1109,7 +1109,7 @@ func TestRemoveAndPush(t *testing.T) {
 				return
 			}
 
-			err := RemoveAndPush(outputPath, repo, tt.component, e, tt.fs, "main", "/")
+			err := RemoveAndPush(outputPath, repo, tt.component.Name, e, tt.fs, "main", "/")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
