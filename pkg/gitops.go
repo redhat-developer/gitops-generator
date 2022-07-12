@@ -182,13 +182,12 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 // RemoveAndPush takes in the following args and updates the gitops resources by removing the given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
-// 2. component: A component struct corresponding to a single Component in an Application in AS
+// 2. component: The component name corresponding to a single Component in an Application in AS. eg. component.Name
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
 // 7. The path within the repository to generate the resources in
-func RemoveAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string) error {
-	componentName := component.Name
+func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string) error {
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
