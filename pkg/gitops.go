@@ -47,7 +47,7 @@ type Executor interface {
 // 7. The path within the repository to generate the resources in
 // 8. The gitops config containing the build bundle;
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
-func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string) error {
+func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string, commonStorage *corev1.PersistentVolumeClaim) error {
 	componentName := component.Name
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
@@ -69,7 +69,7 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
-	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, component, commonStorage); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
@@ -93,7 +93,7 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 	return nil
 }
 
-func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, doPush bool, createdBy string) error {
+func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, doPush bool, createdBy string, commonStorage *corev1.PersistentVolumeClaim) error {
 	CreatedBy = createdBy
 
 	componentName := component.Spec.ComponentName
@@ -106,7 +106,7 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 	gitOpsRepoURL := component.Spec.Source.GitSource.URL
 
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
-	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, component, commonStorage); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 

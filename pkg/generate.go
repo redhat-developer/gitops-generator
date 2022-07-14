@@ -41,7 +41,7 @@ var CreatedBy = "application-service"
 
 // Generate takes in a given Component CR and
 // spits out a deployment, service, and route file to disk
-func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.Component) error {
+func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.Component, commonStorage *corev1.PersistentVolumeClaim) error {
 	deployment := generateDeployment(component)
 
 	k := resources.Kustomization{
@@ -62,9 +62,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 		resources[routeFileName] = route
 	}
 
-	var commonStorage *corev1.PersistentVolumeClaim
-
-	resources["kustomization.yaml"] = k
+	resources[kustomizeFileName] = k
 
 	_, err := yaml.WriteResources(fs, outputFolder, resources)
 	if err != nil {
@@ -112,7 +110,7 @@ func GenerateParentKustomize(fs afero.Afero, gitOpsFolder string, commonStorageP
 		k.AddResources("common-storage-pvc.yaml")
 	}
 
-	resources["kustomization.yaml"] = k
+	resources[kustomizeFileName] = k
 
 	_, err = yaml.WriteResources(fs, gitOpsFolder, resources)
 	return err
