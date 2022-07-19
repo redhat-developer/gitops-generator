@@ -158,7 +158,6 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 		if out, err := e.Execute(repoPath, "git", "init", "."); err != nil {
 			return fmt.Errorf("failed to initialize git repository in %q %q: %s", repoPath, string(out), err)
 		}
-		//if out, err := e.Execute(repoPath, "git", "add", "components", "kustomization.yaml"); err != nil {
 		if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
 			return fmt.Errorf("failed to add components to repository in %q %q: %s", repoPath, string(out), err)
 		}
