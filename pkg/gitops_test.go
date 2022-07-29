@@ -88,7 +88,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", filepath.Join("components", componentName)},
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
 				},
 				{
 					BaseDir: repoPath,
@@ -103,7 +103,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "git",
-					Args:    []string{"commit", "-m", "Generate GitOps resources"},
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
 				},
 				{
 					BaseDir: repoPath,
@@ -210,7 +210,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", filepath.Join("components", componentName)},
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
 				},
 				{
 					BaseDir: repoPath,
@@ -225,7 +225,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "git",
-					Args:    []string{"commit", "-m", "Generate GitOps resources"},
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
 				},
 				{
 					BaseDir: repoPath,
@@ -265,10 +265,10 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 			},
-			wantErrString: "failed to delete \"components/test-component\" folder in repository in \"/fake/path/test-component\" \"test output1\": Permission Denied",
+			wantErrString: "failed to delete \"components/test-component/base\" folder in repository in \"/fake/path/test-component\" \"test output1\": Permission Denied",
 		},
 		{
 			name:      "git add failure",
@@ -302,7 +302,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 				{
 					BaseDir: repoPath,
@@ -346,7 +346,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 				{
 					BaseDir: repoPath,
@@ -397,7 +397,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 				{
 					BaseDir: repoPath,
@@ -412,7 +412,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "git",
-					Args:    []string{"commit", "-m", "Generate GitOps resources"},
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
 				},
 			},
 			wantErrString: "failed to commit files to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
@@ -455,7 +455,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 				{
 					BaseDir: repoPath,
@@ -470,7 +470,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "git",
-					Args:    []string{"commit", "-m", "Generate GitOps resources"},
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
 				},
 				{
 					BaseDir: repoPath,
@@ -499,7 +499,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 			},
 			wantErrString: "failed to generate the gitops resources in \"/fake/path/test-component/components/test-component/base\" for component \"test-component\"",
@@ -531,7 +531,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "rm",
-					Args:    []string{"-rf", "components/test-component"},
+					Args:    []string{"-rf", "components/test-component/base"},
 				},
 			},
 			wantErrString: "failed to generate the gitops resources in \"/fake/path/test-component/components/test-component/base\" for component \"test-component\": failed to MkDirAll",
@@ -555,41 +555,436 @@ func TestGenerateCloneAndPush(t *testing.T) {
 	}
 }
 
-func TestGenerateAndPush(t *testing.T) {
-	repo := "http://github.com/testing/testing.git" // "git@github.com:testing/testing.git"
+func TestGenerateOverlaysAndPush(t *testing.T) {
+	repo := "git@github.com:testing/testing.git"
 	outputPath := "/fake/path"
-	component := gitopsv1alpha1.Component{
-		Spec: gitopsv1alpha1.ComponentSpec{
-			ContainerImage: "testimage:latest",
-			Source: gitopsv1alpha1.ComponentSource{
-				ComponentSourceUnion: gitopsv1alpha1.ComponentSourceUnion{
-					GitSource: &gitopsv1alpha1.GitSource{
-						URL: repo,
-					},
-				},
-			},
-			TargetPort: 5000,
-		},
+	repoPath := "/fake/path/test-application"
+	componentName := "test-component"
+	applicationName := "test-application"
+	environmentName := "environment"
+	imageName := "image"
+	namespace := "namespace"
+	component := gitopsv1alpha1.BindingComponentConfiguration{
+		Name:     componentName,
+		Replicas: 2,
 	}
 	component.Name = "test-component"
-	component.Spec.ComponentName = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
+	readOnlyFs := ioutils.NewReadOnlyFs()
 
 	tests := []struct {
-		name          string
-		fs            afero.Afero
-		component     gitopsv1alpha1.Component
-		errors        *testutils.ErrorStack
-		outputs       [][]byte
-		want          []testutils.Execution
-		wantErrString string
+		name            string
+		fs              afero.Afero
+		component       gitopsv1alpha1.BindingComponentConfiguration
+		environment     gitopsv1alpha1.Environment
+		errors          *testutils.ErrorStack
+		outputs         [][]byte
+		applicationName string
+		environmentName string
+		imageName       string
+		namespace       string
+		want            []testutils.Execution
+		wantErrString   string
 	}{
 		{
-			name:      "No errors. GenerateAndPush test with no push",
+			name:      "No errors",
 			fs:        fs,
 			component: component,
 			errors:    &testutils.ErrorStack{},
-			want:      []testutils.Execution{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name:      "Git clone failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					nil,
+					errors.New("test error"),
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+			},
+			wantErrString: "test error",
+		},
+		{
+			name:      "Git switch failure, git checkout failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Permission denied"),
+					errors.New("Fatal error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"checkout", "-b", "main"},
+				},
+			},
+			wantErrString: "failed to checkout branch \"main\" in \"/fake/path/test-application\" \"test output1\": Permission denied",
+		},
+		{
+			name:      "Git switch failure, git checkout success",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					nil,
+					errors.New("test error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"checkout", "-b", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name:      "git add failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+			},
+			wantErrString: "failed to add files for component \"test-component\" to repository in \"/fake/path/test-application\" \"test output1\": Fatal error",
+		},
+		{
+			name:      "git diff failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Permission Denied"),
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+			},
+			wantErrString: "failed to check git diff in repository \"/fake/path/test-application\" \"test output1\": Permission Denied",
+		},
+		{
+			name:      "git commit failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)},
+				},
+			},
+			wantErrString: "failed to commit files to repository in \"/fake/path/test-application\" \"test output1\": Fatal error",
+		},
+		{
+			name:      "git push failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+			},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+			wantErrString: "failed push remote to repository \"git@github.com:testing/testing.git\" \"test output1\": Fatal error",
+		},
+		{
+			name:            "gitops generate failure",
+			fs:              readOnlyFs,
+			component:       component,
+			errors:          &testutils.ErrorStack{},
+			applicationName: applicationName,
+			environmentName: environmentName,
+			imageName:       imageName,
+			namespace:       namespace,
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+			},
+			wantErrString: "failed to generate the gitops resources in overlays dir \"/fake/path/test-application/components/test-component/overlays/environment\" for component \"test-component\"",
 		},
 	}
 
@@ -597,12 +992,21 @@ func TestGenerateAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
-			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false, "KAM CLI")
+			generatedResources := make(map[string][]string)
+			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.environment, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, e, tt.fs, "main", "/", generatedResources)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
 			} else {
 				testutils.AssertNoError(t, err)
+				assert.Equal(t, 1, len(generatedResources), "should be equal")
+				hasGitopsGeneratedResource := map[string]bool{
+					"deployment-patch.yaml": true,
+				}
+
+				for _, generatedRes := range generatedResources[componentName] {
+					assert.True(t, hasGitopsGeneratedResource[generatedRes], "should be equal")
+				}
 			}
 
 			assert.Equal(t, tt.want, e.Executed, "command executed should be equal")
@@ -1145,6 +1549,61 @@ func TestExecute(t *testing.T) {
 			if !tt.wantErr && (err != nil) {
 				t.Errorf("TestExecute() unexpected error value: %v", err)
 			}
+		})
+	}
+}
+
+func TestGenerateAndPush(t *testing.T) {
+	repo := "http://github.com/testing/testing.git"
+	outputPath := "/fake/path"
+	component := gitopsv1alpha1.Component{
+		Spec: gitopsv1alpha1.ComponentSpec{
+			ContainerImage: "testimage:latest",
+			Source: gitopsv1alpha1.ComponentSource{
+				ComponentSourceUnion: gitopsv1alpha1.ComponentSourceUnion{
+					GitSource: &gitopsv1alpha1.GitSource{
+						URL: repo,
+					},
+				},
+			},
+			TargetPort: 5000,
+		},
+	}
+	component.Name = "test-component"
+	component.Spec.ComponentName = "test-component"
+	fs := ioutils.NewMemoryFilesystem()
+
+	tests := []struct {
+		name          string
+		fs            afero.Afero
+		component     gitopsv1alpha1.Component
+		errors        *testutils.ErrorStack
+		outputs       [][]byte
+		want          []testutils.Execution
+		wantErrString string
+	}{
+		{
+			name:      "No errors. GenerateAndPush test with no push",
+			fs:        fs,
+			component: component,
+			errors:    &testutils.ErrorStack{},
+			want:      []testutils.Execution{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := testutils.NewMockExecutor(tt.outputs...)
+			e.Errors = tt.errors
+			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false, "KAM CLI", nil)
+
+			if tt.wantErrString != "" {
+				testutils.AssertErrorMatch(t, tt.wantErrString, err)
+			} else {
+				testutils.AssertNoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, e.Executed, "command executed should be equal")
 		})
 	}
 }
