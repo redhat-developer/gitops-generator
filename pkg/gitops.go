@@ -291,6 +291,6 @@ func (e CmdExecutor) Execute(baseDir, command string, args ...string) ([]byte, e
 	return output, err
 }
 
-func (e CmdExecutor) GenerateParentKustomize(fs afero.Afero, gitOpsFolder string, commonStoragePVC *corev1.PersistentVolumeClaim) error {
+func (e CmdExecutor) GenerateParentKustomize(fs afero.Afero, gitOpsFolder string) error {
 	return GenerateParentKustomize(fs, gitOpsFolder)
 }
