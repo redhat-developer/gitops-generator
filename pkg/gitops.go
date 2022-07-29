@@ -34,7 +34,7 @@ const defaultRepoDescription = "Bootstrapped GitOps Repository based on Componen
 
 type Executor interface {
 	Execute(baseDir, command string, args ...string) ([]byte, error)
-	GenerateParentKustomize(fs afero.Afero, gitOpsFolder string, commonStoragePVC *corev1.PersistentVolumeClaim) error
+	GenerateParentKustomize(fs afero.Afero, gitOpsFolder string) error
 }
 
 // GenerateCloneAndPush takes in the following args and generates the gitops resources for a given component
@@ -47,13 +47,15 @@ type Executor interface {
 // 7. The path within the repository to generate the resources in
 // 8. The gitops config containing the build bundle;
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
-func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string, commonStorage *corev1.PersistentVolumeClaim) error {
+func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string) error {
 	componentName := component.Name
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
 
 	repoPath := filepath.Join(outputPath, componentName)
+	gitopsFolder := filepath.Join(repoPath, context)
+	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
 
 	// Checkout the specified branch
 	if _, err := e.Execute(repoPath, "git", "switch", branch); err != nil {
@@ -62,14 +64,12 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 		}
 	}
 
-	if out, err := e.Execute(repoPath, "rm", "-rf", filepath.Join("components", componentName)); err != nil {
-		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", filepath.Join("components", componentName), repoPath, string(out), err)
+	if out, err := e.Execute(repoPath, "rm", "-rf", filepath.Join("components", componentName, "base")); err != nil {
+		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", filepath.Join("components", componentName, "base"), repoPath, string(out), err)
 	}
 
 	// Generate the gitops resources and update the parent kustomize yaml file
-	gitopsFolder := filepath.Join(repoPath, context)
-	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
-	if err := Generate(appFs, gitopsFolder, componentPath, component, commonStorage); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
@@ -82,7 +82,7 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
 	} else if string(out) != "" {
 		// Commit the changes and push
-		if out, err := e.Execute(repoPath, "git", "commit", "-m", "Generate GitOps resources"); err != nil {
+		if out, err := e.Execute(repoPath, "git", "commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)); err != nil {
 			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
 		}
 		if out, err := e.Execute(repoPath, "git", "push", "origin", branch); err != nil {
@@ -106,7 +106,7 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 	gitOpsRepoURL := component.Spec.Source.GitSource.URL
 
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
-	if err := Generate(appFs, gitopsFolder, componentPath, component, commonStorage); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
@@ -178,6 +178,51 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 	return nil
 }
 
+// GenerateOverlaysAndPush generates the overlays kustomize from App Env Snapshot Binding Spec
+func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, componentGeneratedResources map[string][]string) error {
+	componentName := component.Name
+	repoPath := filepath.Join(outputPath, applicationName)
+
+	if clone {
+		if out, err := e.Execute(outputPath, "git", "clone", remote, applicationName); err != nil {
+			return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
+		}
+
+		// Checkout the specified branch
+		if _, err := e.Execute(repoPath, "git", "switch", branch); err != nil {
+			if out, err := e.Execute(repoPath, "git", "checkout", "-b", branch); err != nil {
+				return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
+			}
+		}
+	}
+
+	// Generate the gitops resources and update the parent kustomize yaml file
+	gitopsFolder := filepath.Join(repoPath, context)
+	componentEnvOverlaysPath := filepath.Join(gitopsFolder, "components", componentName, "overlays", environmentName)
+	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, component, environment, imageName, namespace, componentGeneratedResources); err != nil {
+		return fmt.Errorf("failed to generate the gitops resources in overlays dir %q for component %q: %s", componentEnvOverlaysPath, componentName, err)
+	}
+
+	if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
+		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
+	}
+
+	// See if any files changed, and if so, commit and push them up to the repository
+	if out, err := e.Execute(repoPath, "git", "--no-pager", "diff", "--cached"); err != nil {
+		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
+	} else if string(out) != "" {
+		// Commit the changes and push
+		if out, err := e.Execute(repoPath, "git", "commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)); err != nil {
+			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
+		}
+		if out, err := e.Execute(repoPath, "git", "push", "origin", branch); err != nil {
+			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
+		}
+	}
+
+	return nil
+}
+
 // RemoveAndPush takes in the following args and updates the gitops resources by removing the given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
@@ -206,7 +251,7 @@ func RemoveAndPush(outputPath string, remote string, componentName string, e Exe
 	if out, err := e.Execute(repoPath, "rm", "-rf", componentPath); err != nil {
 		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", componentPath, repoPath, string(out), err)
 	}
-	if err := e.GenerateParentKustomize(appFs, gitopsFolder, nil); err != nil {
+	if err := e.GenerateParentKustomize(appFs, gitopsFolder); err != nil {
 		return fmt.Errorf("failed to re-generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
@@ -247,5 +292,5 @@ func (e CmdExecutor) Execute(baseDir, command string, args ...string) ([]byte, e
 }
 
 func (e CmdExecutor) GenerateParentKustomize(fs afero.Afero, gitOpsFolder string, commonStoragePVC *corev1.PersistentVolumeClaim) error {
-	return GenerateParentKustomize(fs, gitOpsFolder, commonStoragePVC)
+	return GenerateParentKustomize(fs, gitOpsFolder)
 }

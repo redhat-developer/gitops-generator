@@ -84,6 +84,9 @@ type ComponentSpec struct {
 
 	// The container image to build or create the component from
 	ContainerImage string `json:"containerImage,omitempty"`
+
+	// Whether or not to bypass the generation of GitOps resources for the Component. Defaults to false.
+	SkipGitOpsResourceGeneration bool `json:"skipGitOpsResourceGeneration,omitempty"`
 }
 
 // ComponentStatus defines the observed state of Component
@@ -114,6 +117,9 @@ type GitOpsStatus struct {
 
 	// Context is the path within the gitops repository used for the gitops resources
 	Context string `json:"context,omitempty"`
+
+	// ResourceGenerationSkipped is whether or not GitOps resource generation was skipped for the component
+	ResourceGenerationSkipped bool `json:"resourceGenerationSkipped,omitempty"`
 }
 
 // Component is the Schema for the components API
@@ -123,4 +129,36 @@ type Component struct {
 
 	Spec   ComponentSpec   `json:"spec,omitempty"`
 	Status ComponentStatus `json:"status,omitempty"`
+}
+
+type BindingComponentConfiguration struct {
+
+	// Name is the name of the component.
+	Name string `json:"name"`
+
+	// Replicas defines the number of replicas to use for the component
+	Replicas int `json:"replicas"`
+
+	// Resources defines the Compute Resources required by the component
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Env describes environment variables to use for the component
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+type EnvironmentConfiguration struct {
+	// Env is an array of standard environment variables
+	Env []corev1.EnvVar `json:"env"`
+}
+
+type EnvironmentSpec struct {
+	// Configuration contains environment-specific details for Applications/Components that are deployed to
+	// the Environment.
+	Configuration EnvironmentConfiguration `json:"configuration,omitempty"`
+}
+
+type Environment struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              EnvironmentSpec `json:"spec,omitempty"`
 }
