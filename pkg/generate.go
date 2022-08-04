@@ -120,6 +120,32 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 	return err
 }
 
+func UpdateExistingKustomize(fs afero.Afero, outputFolder string) error {
+	k := resources.Kustomization{
+		APIVersion: "kustomize.config.k8s.io/v1beta1",
+		Kind:       "Kustomization",
+	}
+
+	resources := map[string]interface{}{}
+	fInfo, err := fs.ReadDir(outputFolder)
+	if err != nil {
+		return err
+	}
+	for _, file := range fInfo {
+		if file.Name() != kustomizeFileName && !file.IsDir() {
+			k.AddResources(file.Name())
+		}
+		if file.IsDir() {
+			k.AddResources(file.Name() + "/")
+		}
+	}
+
+	resources[kustomizeFileName] = k
+
+	_, err = yaml.WriteResources(fs, outputFolder, resources)
+	return err
+}
+
 // GenerateParentKustomize takes in a folder of components, and outputs a kustomize file to the outputFolder dir
 // containing entries for each Component.
 // If commonStoragePVC is non-nil, it will also add the common storage pvc yaml file to the parent kustomize. If it's nil, it will not be added
