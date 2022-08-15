@@ -74,12 +74,16 @@ func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1al
 	}
 
 	if doPush {
-		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Generate GitOps base resources for component %s", componentName))
+		return CommitAndPush(outputPath, "", remote, componentName, e, branch, fmt.Sprintf("Generate GitOps base resources for component %s", componentName))
 	}
 	return nil
 }
 
-func CommitAndPush(repoPath string, remote string, componentName string, e Executor, branch string, commitMessage string) error {
+func CommitAndPush(outputPath string, repoPathOverride string, remote string, componentName string, e Executor, branch string, commitMessage string) error {
+	repoPath := filepath.Join(outputPath, componentName)
+	if repoPathOverride != "" {
+		repoPath = filepath.Join(outputPath, repoPathOverride)
+	}
 	if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
 		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
 	}
@@ -210,7 +214,7 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 	}
 
 	if doPush {
-		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName))
+		return CommitAndPush(outputPath, applicationName, remote, componentName, e, branch, fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName))
 	}
 	return nil
 }
@@ -248,7 +252,7 @@ func RemoveAndPush(outputPath string, remote string, componentName string, e Exe
 	}
 
 	if doPush {
-		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Removed component %s", componentName))
+		return CommitAndPush(outputPath, "", remote, componentName, e, branch, fmt.Sprintf("Removed component %s", componentName))
 	}
 
 	return nil
