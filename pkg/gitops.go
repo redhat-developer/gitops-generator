@@ -37,7 +37,7 @@ type Executor interface {
 	GenerateParentKustomize(fs afero.Afero, gitOpsFolder string) error
 }
 
-// GenerateCloneAndPush takes in the following args and generates the gitops resources for a given component
+// CloneGenerateAndPush takes in the following args and generates the gitops resources for a given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
 // 2. component: A component struct corresponding to a single Component in an Application in AS
@@ -47,7 +47,7 @@ type Executor interface {
 // 7. The path within the repository to generate the resources in
 // 8. The gitops config containing the build bundle;
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
-func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string) error {
+func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
 	componentName := component.Name
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
@@ -73,6 +73,13 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
+	if doPush {
+		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Generate GitOps base resources for component %s", componentName))
+	}
+	return nil
+}
+
+func CommitAndPush(repoPath string, remote string, componentName string, e Executor, branch string, commitMessage string) error {
 	if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
 		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
 	}
@@ -82,14 +89,13 @@ func GenerateCloneAndPush(outputPath string, remote string, component gitopsv1al
 		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
 	} else if string(out) != "" {
 		// Commit the changes and push
-		if out, err := e.Execute(repoPath, "git", "commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)); err != nil {
+		if out, err := e.Execute(repoPath, "git", "commit", "-m", commitMessage); err != nil {
 			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
 		}
 		if out, err := e.Execute(repoPath, "git", "push", "origin", branch); err != nil {
 			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
 		}
 	}
-
 	return nil
 }
 
@@ -179,7 +185,7 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 }
 
 // GenerateOverlaysAndPush generates the overlays kustomize from App Env Snapshot Binding Spec
-func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, componentGeneratedResources map[string][]string) error {
+func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 	componentName := component.Name
 	repoPath := filepath.Join(outputPath, applicationName)
 
@@ -203,23 +209,9 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 		return fmt.Errorf("failed to generate the gitops resources in overlays dir %q for component %q: %s", componentEnvOverlaysPath, componentName, err)
 	}
 
-	if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
-		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
+	if doPush {
+		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName))
 	}
-
-	// See if any files changed, and if so, commit and push them up to the repository
-	if out, err := e.Execute(repoPath, "git", "--no-pager", "diff", "--cached"); err != nil {
-		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
-	} else if string(out) != "" {
-		// Commit the changes and push
-		if out, err := e.Execute(repoPath, "git", "commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)); err != nil {
-			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
-		}
-		if out, err := e.Execute(repoPath, "git", "push", "origin", branch); err != nil {
-			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
-		}
-	}
-
 	return nil
 }
 
@@ -231,7 +223,7 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
 // 7. The path within the repository to generate the resources in
-func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string) error {
+func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
@@ -255,21 +247,8 @@ func RemoveAndPush(outputPath string, remote string, componentName string, e Exe
 		return fmt.Errorf("failed to re-generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
-	if out, err := e.Execute(repoPath, "git", "add", "."); err != nil {
-		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
-	}
-
-	// See if any files changed, and if so, commit and push them up to the repository
-	if out, err := e.Execute(repoPath, "git", "--no-pager", "diff", "--cached"); err != nil {
-		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
-	} else if string(out) != "" {
-		// Commit the changes and push
-		if out, err := e.Execute(repoPath, "git", "commit", "-m", fmt.Sprintf("Removed component %s", componentName)); err != nil {
-			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
-		}
-		if out, err := e.Execute(repoPath, "git", "push", "origin", branch); err != nil {
-			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
-		}
+	if doPush {
+		return CommitAndPush(repoPath, remote, componentName, e, branch, fmt.Sprintf("Removed component %s", componentName))
 	}
 
 	return nil
