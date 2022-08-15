@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestGenerateCloneAndPush(t *testing.T) {
+func TestCloneGenerateAndPush(t *testing.T) {
 	repo := "git@github.com:testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
@@ -542,7 +542,7 @@ func TestGenerateCloneAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
-			err := GenerateCloneAndPush(outputPath, repo, tt.component, e, tt.fs, "main", "/")
+			err := CloneGenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", "/", true)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -993,7 +993,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
 			generatedResources := make(map[string][]string)
-			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.environment, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, e, tt.fs, "main", "/", generatedResources)
+			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.environment, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, e, tt.fs, "main", "/", true, generatedResources)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -1513,7 +1513,7 @@ func TestRemoveAndPush(t *testing.T) {
 				return
 			}
 
-			err := RemoveAndPush(outputPath, repo, tt.component.Name, e, tt.fs, "main", "/")
+			err := RemoveAndPush(outputPath, repo, tt.component.Name, e, tt.fs, "main", "/", true)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
