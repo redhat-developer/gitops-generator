@@ -17,7 +17,6 @@
 package yaml
 
 import (
-	"github.com/redhat-developer/gitops-generator/pkg/testutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,6 +24,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/redhat-developer/gitops-generator/pkg/testutils"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/redhat-developer/gitops-generator/pkg/resources"

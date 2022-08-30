@@ -17,8 +17,9 @@ package gitops
 
 import (
 	"fmt"
-	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"path/filepath"
+
+	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/redhat-developer/gitops-generator/pkg/resources"
