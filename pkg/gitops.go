@@ -18,12 +18,13 @@ package gitops
 import (
 	"context"
 	"fmt"
-	"github.com/jenkins-x/go-scm/scm"
-	"github.com/jenkins-x/go-scm/scm/factory"
 	"net/url"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/jenkins-x/go-scm/scm"
+	"github.com/jenkins-x/go-scm/scm/factory"
 
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/spf13/afero"
