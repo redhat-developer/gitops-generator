@@ -750,7 +750,7 @@ func TestGenerateOverlays(t *testing.T) {
 					"patch1.yaml",
 				},
 			},
-			expectPatchEntries: 2,
+			expectPatchEntries: 3,
 			wantErr:            "",
 		},
 	}
@@ -784,7 +784,7 @@ func TestGenerateOverlays(t *testing.T) {
 
 				// There match patch entries in the kustomization file
 				if len(k.Patches) != tt.expectPatchEntries {
-					t.Errorf("expected %v kustomization bases, got %v", 3, len(k.Patches))
+					t.Errorf("expected %v kustomization bases, got %v patches: %v", tt.expectPatchEntries, len(k.Patches), k.Patches)
 				}
 
 				// Validate that the APIVersion and Kind are set properly
