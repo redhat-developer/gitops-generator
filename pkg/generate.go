@@ -270,6 +270,7 @@ func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfigurat
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
+			Selector: &v1.LabelSelector{},
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
