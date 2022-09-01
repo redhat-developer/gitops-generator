@@ -57,15 +57,19 @@ func removeDuplicatesAndSort(s []string) []string {
 }
 
 func (k *Kustomization) CompareDifferenceAndAddCustomPatches(original []string, generated []string) {
-	generatedPatches := make(map[string]bool)
-	for _, genratedElement := range generated {
-		generatedPatches[genratedElement] = true
-	}
-
+	newPatchesList := original
+	newGeneratedFiles := []string{}
+	originalPatches := make(map[string]bool)
 	for _, originalElement := range original {
-		// if the patch is not generated
-		if _, ok := generatedPatches[originalElement]; !ok {
-			k.AddPatches(originalElement)
+		originalPatches[originalElement] = true
+	}
+	for _, generatedElement := range generated {
+		if _, ok := originalPatches[generatedElement]; !ok {
+			// preserve the newGeneratedFiles order
+			newGeneratedFiles = append(newGeneratedFiles, generatedElement)
 		}
 	}
+	// new generated files should add to the top of the patch list
+	newPatchesList = append(newGeneratedFiles, newPatchesList...)
+	k.Patches = newPatchesList
 }
