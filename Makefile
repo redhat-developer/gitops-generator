@@ -11,7 +11,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: test
 test:
-	go test ./...
+	go test ./... -coverprofile cover.out
 
 .PHONY: gotest
 gotest:
