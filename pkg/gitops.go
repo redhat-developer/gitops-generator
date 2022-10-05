@@ -241,7 +241,6 @@ func RemoveAndPush(outputPath string, remote string, componentName string, e Exe
 		}
 	}
 
-	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName)
 	if out, err := e.Execute(repoPath, "rm", "-rf", componentPath); err != nil {
