@@ -1036,7 +1036,6 @@ func TestRemoveAndPush(t *testing.T) {
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
-	readOnlyFs := ioutils.NewReadOnlyFs()
 
 	tests := []struct {
 		name          string
@@ -1267,7 +1266,6 @@ func TestRemoveAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
-					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1307,7 +1305,6 @@ func TestRemoveAndPush(t *testing.T) {
 			errors: &testutils.ErrorStack{
 				Errors: []error{
 					errors.New("Permission Denied"),
-					nil,
 					nil,
 					nil,
 					nil,
@@ -1357,7 +1354,6 @@ func TestRemoveAndPush(t *testing.T) {
 			errors: &testutils.ErrorStack{
 				Errors: []error{
 					errors.New("Fatal error"),
-					nil,
 					nil,
 					nil,
 					nil,
@@ -1420,7 +1416,6 @@ func TestRemoveAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
-					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1470,37 +1465,6 @@ func TestRemoveAndPush(t *testing.T) {
 				},
 			},
 			wantErrString: "failed push remote to repository \"git@github.com:testing/testing.git\" \"test output1\": Fatal error",
-		},
-		{
-			name:      "kustomize generate failure",
-			fs:        readOnlyFs,
-			component: component,
-			errors: &testutils.ErrorStack{
-				Errors: []error{
-					errors.New("access error"),
-					nil,
-					nil,
-					nil,
-				},
-			},
-			want: []testutils.Execution{
-				{
-					BaseDir: outputPath,
-					Command: "git",
-					Args:    []string{"clone", repo, component.Name},
-				},
-				{
-					BaseDir: repoPath,
-					Command: "git",
-					Args:    []string{"switch", "main"},
-				},
-				{
-					BaseDir: repoPath,
-					Command: "rm",
-					Args:    []string{"-rf", componentPath},
-				},
-			},
-			wantErrString: "failed to re-generate the gitops resources in \"/fake/path/test-component/components/test-component\" for component \"test-component\": access error",
 		},
 	}
 

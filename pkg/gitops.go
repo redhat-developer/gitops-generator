@@ -35,7 +35,6 @@ const defaultRepoDescription = "Bootstrapped GitOps Repository based on Componen
 
 type Executor interface {
 	Execute(baseDir, command string, args ...string) ([]byte, error)
-	GenerateParentKustomize(fs afero.Afero, gitOpsFolder string) error
 }
 
 // CloneGenerateAndPush takes in the following args and generates the gitops resources for a given component
@@ -242,14 +241,10 @@ func RemoveAndPush(outputPath string, remote string, componentName string, e Exe
 		}
 	}
 
-	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName)
 	if out, err := e.Execute(repoPath, "rm", "-rf", componentPath); err != nil {
 		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", componentPath, repoPath, string(out), err)
-	}
-	if err := e.GenerateParentKustomize(appFs, gitopsFolder); err != nil {
-		return fmt.Errorf("failed to re-generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
 	if doPush {
@@ -273,10 +268,6 @@ func (e CmdExecutor) Execute(baseDir, command string, args ...string) ([]byte, e
 	c.Dir = baseDir
 	output, err := c.CombinedOutput()
 	return output, err
-}
-
-func (e CmdExecutor) GenerateParentKustomize(fs afero.Afero, gitOpsFolder string) error {
-	return GenerateParentKustomize(fs, gitOpsFolder)
 }
 
 // GetCommitIDFromRepo returns the commit ID for the given repository
