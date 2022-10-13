@@ -27,7 +27,6 @@ import (
 	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCloneGenerateAndPush(t *testing.T) {
@@ -35,18 +34,12 @@ func TestCloneGenerateAndPush(t *testing.T) {
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
 	componentName := "test-component"
-	component := gitopsv1alpha1.Component{
-		Spec: gitopsv1alpha1.ComponentSpec{
-			ContainerImage: "testimage:latest",
-			Source: gitopsv1alpha1.ComponentSource{
-				ComponentSourceUnion: gitopsv1alpha1.ComponentSourceUnion{
-					GitSource: &gitopsv1alpha1.GitSource{
-						URL: repo,
-					},
-				},
-			},
-			TargetPort: 5000,
+	component := gitopsv1alpha1.GeneratorOptions{
+		ContainerImage: "testimage:latest",
+		GitSource: &gitopsv1alpha1.GitSource{
+			URL: repo,
 		},
+		TargetPort: 5000,
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
@@ -55,7 +48,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 	tests := []struct {
 		name          string
 		fs            afero.Afero
-		component     gitopsv1alpha1.Component
+		component     gitopsv1alpha1.GeneratorOptions
 		errors        *testutils.ErrorStack
 		outputs       [][]byte
 		want          []testutils.Execution
@@ -508,14 +501,10 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		{
 			name: "gitops generate failure - image component",
 			fs:   readOnlyFs,
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "test-component",
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ContainerImage: "quay.io/test/test",
-					TargetPort:     5000,
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:           "test-component",
+				ContainerImage: "quay.io/test/test",
+				TargetPort:     5000,
 			},
 			errors: &testutils.ErrorStack{},
 			want: []testutils.Execution{
@@ -565,7 +554,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 	environmentName := "environment"
 	imageName := "image"
 	namespace := "namespace"
-	component := gitopsv1alpha1.BindingComponentConfiguration{
+	component := gitopsv1alpha1.GeneratorOptions{
 		Name:     componentName,
 		Replicas: 2,
 	}
@@ -576,8 +565,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 	tests := []struct {
 		name            string
 		fs              afero.Afero
-		component       gitopsv1alpha1.BindingComponentConfiguration
-		environment     gitopsv1alpha1.Environment
+		component       gitopsv1alpha1.GeneratorOptions
 		errors          *testutils.ErrorStack
 		outputs         [][]byte
 		applicationName string
@@ -994,7 +982,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
 			generatedResources := make(map[string][]string)
-			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.environment, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, e, tt.fs, "main", "/", true, generatedResources)
+			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, e, tt.fs, "main", "/", true, generatedResources)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -1022,17 +1010,11 @@ func TestRemoveAndPush(t *testing.T) {
 	componentPath := "/fake/path/test-component/components/test-component"
 	componentBasePath := "/fake/path/test-component/components/test-component/base"
 	componentName := "test-component"
-	component := gitopsv1alpha1.Component{
-		Spec: gitopsv1alpha1.ComponentSpec{
-			Source: gitopsv1alpha1.ComponentSource{
-				ComponentSourceUnion: gitopsv1alpha1.ComponentSourceUnion{
-					GitSource: &gitopsv1alpha1.GitSource{
-						URL: repo,
-					},
-				},
-			},
-			TargetPort: 5000,
+	component := gitopsv1alpha1.GeneratorOptions{
+		GitSource: &gitopsv1alpha1.GitSource{
+			URL: repo,
 		},
+		TargetPort: 5000,
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
@@ -1040,7 +1022,7 @@ func TestRemoveAndPush(t *testing.T) {
 	tests := []struct {
 		name          string
 		fs            afero.Afero
-		component     gitopsv1alpha1.Component
+		component     gitopsv1alpha1.GeneratorOptions
 		errors        *testutils.ErrorStack
 		outputs       [][]byte
 		want          []testutils.Execution
@@ -1521,27 +1503,20 @@ func TestExecute(t *testing.T) {
 func TestGenerateAndPush(t *testing.T) {
 	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
-	component := gitopsv1alpha1.Component{
-		Spec: gitopsv1alpha1.ComponentSpec{
-			ContainerImage: "testimage:latest",
-			Source: gitopsv1alpha1.ComponentSource{
-				ComponentSourceUnion: gitopsv1alpha1.ComponentSourceUnion{
-					GitSource: &gitopsv1alpha1.GitSource{
-						URL: repo,
-					},
-				},
-			},
-			TargetPort: 5000,
+	component := gitopsv1alpha1.GeneratorOptions{
+		ContainerImage: "testimage:latest",
+		GitSource: &gitopsv1alpha1.GitSource{
+			URL: repo,
 		},
+		TargetPort: 5000,
 	}
 	component.Name = "test-component"
-	component.Spec.ComponentName = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
 
 	tests := []struct {
 		name          string
 		fs            afero.Afero
-		component     gitopsv1alpha1.Component
+		component     gitopsv1alpha1.GeneratorOptions
 		errors        *testutils.ErrorStack
 		outputs       [][]byte
 		want          []testutils.Execution
@@ -1560,7 +1535,7 @@ func TestGenerateAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := testutils.NewMockExecutor(tt.outputs...)
 			e.Errors = tt.errors
-			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false, "KAM CLI", nil)
+			err := GenerateAndPush(outputPath, repo, tt.component, e, tt.fs, "main", false, "KAM CLI")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)

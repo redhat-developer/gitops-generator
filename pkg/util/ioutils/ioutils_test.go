@@ -33,10 +33,19 @@ func TestIsExisting(t *testing.T) {
 	secondFile := "/tmp/test-two"
 
 	// Make sure at least one file and one dir exists in each file system for testing
-	fs.Create(fileName)
+	_, err := fs.Create(fileName)
+	if err != nil {
+		t.Errorf("Test case problem creating file. Unexpected error: %v", err)
+	}
 	// fs.Mkdir(dirName, 0755)
-	inmemoryFs.Create(fileName)
-	inmemoryFs.Mkdir(dirName, 0755)
+	_, err = inmemoryFs.Create(fileName)
+	if err != nil {
+		t.Errorf("Test case problem creating file. Unexpected error: %v", err)
+	}
+	err = inmemoryFs.Mkdir(dirName, 0755)
+	if err != nil {
+		t.Errorf("Test case problem creating folder. Unexpected error: %v", err)
+	}
 
 	tests := []struct {
 		name          string

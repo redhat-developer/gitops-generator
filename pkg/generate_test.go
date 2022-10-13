@@ -42,6 +42,13 @@ func TestGenerateDeployment(t *testing.T) {
 	namespace := "test-namespace"
 	replicas := int32(1)
 	otherReplicas := int32(3)
+	customK8slabels := map[string]string{
+		"app.kubernetes.io/name":       componentName,
+		"app.kubernetes.io/instance":   "ComponentCRName",
+		"app.kubernetes.io/part-of":    applicationName,
+		"app.kubernetes.io/managed-by": "kustomize",
+		"app.kubernetes.io/created-by": "GitOps Generator Test",
+	}
 	k8slabels := map[string]string{
 		"app.kubernetes.io/name":       componentName,
 		"app.kubernetes.io/instance":   componentName,
@@ -55,20 +62,15 @@ func TestGenerateDeployment(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		component      gitopsv1alpha1.Component
+		component      gitopsv1alpha1.GeneratorOptions
 		wantDeployment appsv1.Deployment
 	}{
 		{
 			name: "Simple component, no optional fields set",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName: componentName,
-					Application:   applicationName,
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
 			},
 			wantDeployment: appsv1.Deployment{
 				TypeMeta: v1.TypeMeta{
@@ -103,32 +105,28 @@ func TestGenerateDeployment(t *testing.T) {
 		},
 		{
 			name: "Component, optional fields set",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName:  componentName,
-					Application:    applicationName,
-					Replicas:       3,
-					TargetPort:     5000,
-					ContainerImage: "quay.io/test/test-image:latest",
-					Env: []corev1.EnvVar{
-						{
-							Name:  "test",
-							Value: "value",
-						},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:           componentName,
+				Namespace:      namespace,
+				Application:    applicationName,
+				Replicas:       3,
+				TargetPort:     5000,
+				ContainerImage: "quay.io/test/test-image:latest",
+				K8sLabels:      customK8slabels,
+				BaseEnvVar: []corev1.EnvVar{
+					{
+						Name:  "test",
+						Value: "value",
 					},
-					Resources: corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("2M"),
-							corev1.ResourceMemory: resource.MustParse("1Gi"),
-						},
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("1M"),
-							corev1.ResourceMemory: resource.MustParse("256Mi"),
-						},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2M"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1M"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					},
 				},
 			},
@@ -140,7 +138,7 @@ func TestGenerateDeployment(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name:      componentName,
 					Namespace: namespace,
-					Labels:    k8slabels,
+					Labels:    customK8slabels,
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: &otherReplicas,
@@ -206,16 +204,11 @@ func TestGenerateDeployment(t *testing.T) {
 		},
 		{
 			name: "Simple image component, no optional fields set",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName:  componentName,
-					Application:    applicationName,
-					ContainerImage: "quay.io/test/test:latest",
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:           componentName,
+				Namespace:      namespace,
+				Application:    applicationName,
+				ContainerImage: "quay.io/test/test:latest",
 			},
 			wantDeployment: appsv1.Deployment{
 				TypeMeta: v1.TypeMeta{
@@ -251,17 +244,12 @@ func TestGenerateDeployment(t *testing.T) {
 		},
 		{
 			name: "Simple image component with pull secret set",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName:  componentName,
-					Application:    applicationName,
-					Secret:         "my-image-pull-secret",
-					ContainerImage: "quay.io/test/test:latest",
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:           componentName,
+				Namespace:      namespace,
+				Application:    applicationName,
+				Secret:         "my-image-pull-secret",
+				ContainerImage: "quay.io/test/test:latest",
 			},
 			wantDeployment: appsv1.Deployment{
 				TypeMeta: v1.TypeMeta{
@@ -321,42 +309,35 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		component      gitopsv1alpha1.BindingComponentConfiguration
-		environment    gitopsv1alpha1.Environment
+		component      gitopsv1alpha1.GeneratorOptions
 		imageName      string
 		namespace      string
 		wantDeployment appsv1.Deployment
 	}{
 		{
 			name: "Simple component, no optional fields set",
-			component: gitopsv1alpha1.BindingComponentConfiguration{
+			component: gitopsv1alpha1.GeneratorOptions{
 				Name:     componentName,
 				Replicas: int(replicas),
-				Env: []corev1.EnvVar{
+				BaseEnvVar: []corev1.EnvVar{
 					{
 						Name:  "FOO",
 						Value: "BAR",
 					},
 				},
-				Resources: &corev1.ResourceRequirements{
+				Resources: corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("1"),
 					},
 				},
-			},
-			environment: gitopsv1alpha1.Environment{
-				Spec: gitopsv1alpha1.EnvironmentSpec{
-					Configuration: gitopsv1alpha1.EnvironmentConfiguration{
-						Env: []corev1.EnvVar{
-							{
-								Name:  "FOO",
-								Value: "BAR_ENV",
-							},
-							{
-								Name:  "FOO2",
-								Value: "BAR2_ENV",
-							},
-						},
+				OverlayEnvVar: []corev1.EnvVar{
+					{
+						Name:  "FOO",
+						Value: "BAR_ENV",
+					},
+					{
+						Name:  "FOO2",
+						Value: "BAR2_ENV",
 					},
 				},
 			},
@@ -406,7 +387,7 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			generatedDeployment := generateDeploymentPatch(tt.component, tt.environment, tt.imageName, tt.namespace)
+			generatedDeployment := generateDeploymentPatch(tt.component, tt.imageName, tt.namespace)
 
 			if !reflect.DeepEqual(*generatedDeployment, tt.wantDeployment) {
 				t.Errorf("TestGenerateDeploymentPatch() error: expected %v got %v", tt.wantDeployment, *generatedDeployment)
@@ -419,6 +400,13 @@ func TestGenerateService(t *testing.T) {
 	applicationName := "test-application"
 	componentName := "test-component"
 	namespace := "test-namespace"
+	customK8sLabels := map[string]string{
+		"app.kubernetes.io/name":       componentName,
+		"app.kubernetes.io/instance":   "ComponentCRName",
+		"app.kubernetes.io/part-of":    applicationName,
+		"app.kubernetes.io/managed-by": "kustomize",
+		"app.kubernetes.io/created-by": "GitOps Generator Test",
+	}
 	k8slabels := map[string]string{
 		"app.kubernetes.io/name":       componentName,
 		"app.kubernetes.io/instance":   componentName,
@@ -432,21 +420,16 @@ func TestGenerateService(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		component   gitopsv1alpha1.Component
+		component   gitopsv1alpha1.GeneratorOptions
 		wantService corev1.Service
 	}{
 		{
 			name: "Simple component object",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName: componentName,
-					Application:   applicationName,
-					TargetPort:    5000,
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
 			},
 			wantService: corev1.Service{
 				TypeMeta: v1.TypeMeta{
@@ -457,6 +440,36 @@ func TestGenerateService(t *testing.T) {
 					Name:      componentName,
 					Namespace: namespace,
 					Labels:    k8slabels,
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: matchLabels,
+					Ports: []corev1.ServicePort{
+						{
+							Port:       int32(5000),
+							TargetPort: intstr.FromInt(5000),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Simple component object with custom k8s labels",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				K8sLabels:   customK8sLabels,
+			},
+			wantService: corev1.Service{
+				TypeMeta: v1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Service",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      componentName,
+					Namespace: namespace,
+					Labels:    customK8sLabels,
 				},
 				Spec: corev1.ServiceSpec{
 					Selector: matchLabels,
@@ -486,6 +499,13 @@ func TestGenerateRoute(t *testing.T) {
 	applicationName := "test-application"
 	componentName := "test-component"
 	namespace := "test-namespace"
+	customK8sLabels := map[string]string{
+		"app.kubernetes.io/name":       componentName,
+		"app.kubernetes.io/instance":   "ComponentCRName",
+		"app.kubernetes.io/part-of":    applicationName,
+		"app.kubernetes.io/managed-by": "kustomize",
+		"app.kubernetes.io/created-by": "GitOps Generator Test",
+	}
 	k8slabels := map[string]string{
 		"app.kubernetes.io/name":       componentName,
 		"app.kubernetes.io/instance":   componentName,
@@ -497,21 +517,16 @@ func TestGenerateRoute(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		component gitopsv1alpha1.Component
+		component gitopsv1alpha1.GeneratorOptions
 		wantRoute routev1.Route
 	}{
 		{
 			name: "Simple component object",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName: componentName,
-					Application:   applicationName,
-					TargetPort:    5000,
-				},
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
 			},
 			wantRoute: routev1.Route{
 				TypeMeta: v1.TypeMeta{
@@ -540,18 +555,14 @@ func TestGenerateRoute(t *testing.T) {
 			},
 		},
 		{
-			name: "Component object with route/hostname set",
-			component: gitopsv1alpha1.Component{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-				},
-				Spec: gitopsv1alpha1.ComponentSpec{
-					ComponentName: componentName,
-					Application:   applicationName,
-					TargetPort:    5000,
-					Route:         "example.com",
-				},
+			name: "Component object with route/hostname and custom k8s labels set",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				K8sLabels:   customK8sLabels,
+				Route:       "example.com",
 			},
 			wantRoute: routev1.Route{
 				TypeMeta: v1.TypeMeta{
@@ -561,7 +572,7 @@ func TestGenerateRoute(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name:      componentName,
 					Namespace: namespace,
-					Labels:    k8slabels,
+					Labels:    customK8sLabels,
 				},
 				Spec: routev1.RouteSpec{
 					Host: "example.com",
@@ -632,12 +643,11 @@ func TestGenerateOverlays(t *testing.T) {
 		t.Errorf("unexpected error when writing to kustomizatipn file: %v", err)
 	}
 
-	component := gitopsv1alpha1.BindingComponentConfiguration{
+	component := gitopsv1alpha1.GeneratorOptions{
 		Name: "test-component",
 	}
 	imageName := "test-image"
 	namespace := "test-namespace"
-	environment := gitopsv1alpha1.Environment{}
 
 	tests := []struct {
 		name                        string
@@ -689,7 +699,7 @@ func TestGenerateOverlays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, component, environment, imageName, namespace, tt.componentGeneratedResources)
+			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, component, imageName, namespace, tt.componentGeneratedResources)
 
 			if !testutils.ErrorMatch(t, tt.wantErr, err) {
 				t.Errorf("unexpected error return value. Got %v", err)
