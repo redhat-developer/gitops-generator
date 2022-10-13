@@ -44,7 +44,7 @@ var CreatedBy = "application-service"
 
 // Generate takes in a given Component CR and
 // spits out a deployment, service, and route file to disk
-func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.Component) error {
+func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
 	deployment := generateDeployment(component)
 
 	k := resources.Kustomization{
@@ -57,7 +57,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	}
 
 	// If a targetPort was specified, also generate a service and route
-	if component.Spec.TargetPort != 0 {
+	if component.TargetPort != 0 {
 		service := generateService(component)
 		route := generateRoute(component)
 		k.AddResources(deploymentFileName, serviceFileName, routeFileName)
@@ -76,8 +76,8 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	return nil
 }
 
-// GenerateOverlays generates the overlays dir from a given BindingComponent
-func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, imageName, namespace string, componentGeneratedResources map[string][]string) error {
+// GenerateOverlays generates the overlays director in an existing GitOps structure
+func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, options gitopsv1alpha1.GeneratorOptions, imageName, namespace string, componentGeneratedResources map[string][]string) error {
 	kustomizeFileExist, err := fs.Exists(filepath.Join(outputFolder, kustomizeFileName))
 	if err != nil {
 		return err
@@ -100,17 +100,17 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		Kind:       "Kustomization",
 	}
 
-	deploymentPatch := generateDeploymentPatch(component, environment, imageName, namespace)
+	deploymentPatch := generateDeploymentPatch(options, imageName, namespace)
 
 	k.AddResources("../../base")
 	k.AddPatches(deploymentPatchFileName)
 	if componentGeneratedResources == nil {
 		componentGeneratedResources = make(map[string][]string)
 	}
-	componentGeneratedResources[component.Name] = append(componentGeneratedResources[component.Name], deploymentPatchFileName)
+	componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
 
 	// add back custom kustomization patches
-	k.CompareDifferenceAndAddCustomPatches(originalKustomizeFileContent.Patches, componentGeneratedResources[component.Name])
+	k.CompareDifferenceAndAddCustomPatches(originalKustomizeFileContent.Patches, componentGeneratedResources[options.Name])
 
 	resources := map[string]interface{}{
 		deploymentPatchFileName: deploymentPatch,
@@ -147,10 +147,10 @@ func UpdateExistingKustomize(fs afero.Afero, outputFolder string) error {
 	return err
 }
 
-func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
+func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deployment {
 	var containerImage string
-	if component.Spec.ContainerImage != "" {
-		containerImage = component.Spec.ContainerImage
+	if component.ContainerImage != "" {
+		containerImage = component.ContainerImage
 	}
 	replicas := getReplicas(component)
 	k8sLabels := generateK8sLabels(component)
@@ -180,8 +180,8 @@ func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
 							Name:            "container-image",
 							Image:           containerImage,
 							ImagePullPolicy: corev1.PullAlways,
-							Env:             component.Spec.Env,
-							Resources:       component.Spec.Resources,
+							Env:             component.BaseEnvVar,
+							Resources:       component.Resources,
 						},
 					},
 				},
@@ -191,19 +191,19 @@ func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
 
 	// If a container image source was set in the component *and* a given secret was set for it,
 	// Set the secret as an image pull secret, in case the component references a private image component
-	if component.Spec.ContainerImage != "" && component.Spec.Secret != "" {
+	if component.ContainerImage != "" && component.Secret != "" {
 		deployment.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 			{
-				Name: component.Spec.Secret,
+				Name: component.Secret,
 			},
 		}
 	}
 
 	// Set fields that may have been optionally configured by the component CR
-	if component.Spec.TargetPort != 0 {
+	if component.TargetPort != 0 {
 		deployment.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{
 			{
-				ContainerPort: int32(component.Spec.TargetPort),
+				ContainerPort: int32(component.TargetPort),
 			},
 		}
 		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = &corev1.Probe{
@@ -211,7 +211,7 @@ func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
 			PeriodSeconds:       10,
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(component.Spec.TargetPort),
+					Port: intstr.FromInt(component.TargetPort),
 				},
 			},
 		}
@@ -220,7 +220,7 @@ func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
 			PeriodSeconds:       10,
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(component.Spec.TargetPort),
+					Port: intstr.FromInt(component.TargetPort),
 					Path: "/",
 				},
 			},
@@ -230,7 +230,7 @@ func generateDeployment(component gitopsv1alpha1.Component) *appsv1.Deployment {
 	return &deployment
 }
 
-func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, imageName, namespace string) *appsv1.Deployment {
+func generateDeploymentPatch(options gitopsv1alpha1.GeneratorOptions, imageName, namespace string) *appsv1.Deployment {
 
 	deployment := appsv1.Deployment{
 		TypeMeta: v1.TypeMeta{
@@ -238,7 +238,7 @@ func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfigurat
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      component.Name,
+			Name:      options.Name,
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -256,7 +256,7 @@ func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfigurat
 		},
 	}
 
-	for _, env := range component.Env {
+	for _, env := range options.BaseEnvVar {
 		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,
@@ -264,7 +264,7 @@ func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfigurat
 	}
 
 	// only add the environment env configurations, if a deployment/binding env is not present with the same env name
-	for _, env := range environment.Spec.Configuration.Env {
+	for _, env := range options.OverlayEnvVar {
 		isPresent := false
 		for _, deploymentEnv := range deployment.Spec.Template.Spec.Containers[0].Env {
 			if deploymentEnv.Name == env.Name {
@@ -281,37 +281,35 @@ func generateDeploymentPatch(component gitopsv1alpha1.BindingComponentConfigurat
 		}
 	}
 
-	if component.Replicas > 0 {
-		replica := int32(component.Replicas)
+	if options.Replicas > 0 {
+		replica := int32(options.Replicas)
 		deployment.Spec.Replicas = &replica
 	}
 
-	if component.Resources != nil {
-		deployment.Spec.Template.Spec.Containers[0].Resources = *component.Resources
-	}
+	deployment.Spec.Template.Spec.Containers[0].Resources = options.Resources
 
 	return &deployment
 }
 
-func generateService(component gitopsv1alpha1.Component) *corev1.Service {
-	k8sLabels := generateK8sLabels(component)
-	matchLabels := getMatchLabel(component)
+func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
+	k8sLabels := generateK8sLabels(options)
+	matchLabels := getMatchLabel(options)
 	service := corev1.Service{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Service",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      component.Name,
-			Namespace: component.Namespace,
+			Name:      options.Name,
+			Namespace: options.Namespace,
 			Labels:    k8sLabels,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: matchLabels,
 			Ports: []corev1.ServicePort{
 				{
-					Port:       int32(component.Spec.TargetPort),
-					TargetPort: intstr.FromInt(component.Spec.TargetPort),
+					Port:       int32(options.TargetPort),
+					TargetPort: intstr.FromInt(options.TargetPort),
 				},
 			},
 		},
@@ -320,8 +318,8 @@ func generateService(component gitopsv1alpha1.Component) *corev1.Service {
 	return &service
 }
 
-func generateRoute(component gitopsv1alpha1.Component) *routev1.Route {
-	k8sLabels := generateK8sLabels(component)
+func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {
+	k8sLabels := generateK8sLabels(options)
 	weight := int32(100)
 	route := routev1.Route{
 		TypeMeta: v1.TypeMeta{
@@ -329,13 +327,13 @@ func generateRoute(component gitopsv1alpha1.Component) *routev1.Route {
 			APIVersion: "route.openshift.io/v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      component.Name,
-			Namespace: component.Namespace,
+			Name:      options.Name,
+			Namespace: options.Namespace,
 			Labels:    k8sLabels,
 		},
 		Spec: routev1.RouteSpec{
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(component.Spec.TargetPort),
+				TargetPort: intstr.FromInt(options.TargetPort),
 			},
 			TLS: &routev1.TLSConfig{
 				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
@@ -343,15 +341,15 @@ func generateRoute(component gitopsv1alpha1.Component) *routev1.Route {
 			},
 			To: routev1.RouteTargetReference{
 				Kind:   "Service",
-				Name:   component.Name,
+				Name:   options.Name,
 				Weight: &weight,
 			},
 		},
 	}
 
 	// If the route field is set in the spec, set it to be the host for the route
-	if component.Spec.Route != "" {
-		route.Spec.Host = component.Spec.Route
+	if options.Route != "" {
+		route.Spec.Host = options.Route
 	}
 
 	return &route
@@ -360,9 +358,9 @@ func generateRoute(component gitopsv1alpha1.Component) *routev1.Route {
 // getReplicas returns the number of replicas to be created for the component
 // If the field is not set, it returns a default value of 1
 // ToDo: Handle as part of a defaulting webhook
-func getReplicas(component gitopsv1alpha1.Component) int32 {
-	if component.Spec.Replicas > 0 {
-		return int32(component.Spec.Replicas)
+func getReplicas(options gitopsv1alpha1.GeneratorOptions) int32 {
+	if options.Replicas > 0 {
+		return int32(options.Replicas)
 	}
 	return 1
 }
@@ -373,11 +371,14 @@ func getReplicas(component gitopsv1alpha1.Component) int32 {
 // app.kubernetes.io/part-of: "<application-name>"
 // app.kubernetes.io/managed-by: "kustomize"
 // app.kubernetes.io/created-by: "application-service"
-func generateK8sLabels(component gitopsv1alpha1.Component) map[string]string {
+func generateK8sLabels(options gitopsv1alpha1.GeneratorOptions) map[string]string {
+	if options.K8sLabels != nil {
+		return options.K8sLabels
+	}
 	return map[string]string{
-		"app.kubernetes.io/name":       component.Spec.ComponentName,
-		"app.kubernetes.io/instance":   component.Name,
-		"app.kubernetes.io/part-of":    component.Spec.Application,
+		"app.kubernetes.io/name":       options.Name,
+		"app.kubernetes.io/instance":   options.Name,
+		"app.kubernetes.io/part-of":    options.Application,
 		"app.kubernetes.io/managed-by": "kustomize",
 		"app.kubernetes.io/created-by": CreatedBy,
 	}
@@ -385,8 +386,8 @@ func generateK8sLabels(component gitopsv1alpha1.Component) map[string]string {
 
 // GetMatchLabel returns the label selector that will be used to tie deployments, services, and pods together
 // For cleanliness, using just one unique label from the generateK8sLabels function
-func getMatchLabel(component gitopsv1alpha1.Component) map[string]string {
+func getMatchLabel(options gitopsv1alpha1.GeneratorOptions) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/instance": component.Name,
+		"app.kubernetes.io/instance": options.Name,
 	}
 }

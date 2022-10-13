@@ -29,7 +29,6 @@ import (
 
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/spf13/afero"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const defaultRepoDescription = "Bootstrapped GitOps Repository based on Components"
@@ -41,15 +40,15 @@ type Executor interface {
 // CloneGenerateAndPush takes in the following args and generates the gitops resources for a given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
-// 3. component: A component struct corresponding to a single Component in an Application in AS
+// 3. options: Options for resource generation
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
 // 7. The path within the repository to generate the resources in
 // 8. The gitops config containing the build bundle;
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
-func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
-	componentName := component.Name
+func CloneGenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
+	componentName := options.Name
 
 	invalidRemoteErr := util.ValidateRemote(remote)
 	if invalidRemoteErr != nil {
@@ -76,7 +75,7 @@ func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1al
 	}
 
 	// Generate the gitops resources and update the parent kustomize yaml file
-	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
@@ -86,6 +85,14 @@ func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1al
 	return nil
 }
 
+// CommitAndPush pushes any new changes to the GitOps repo.  The folder should already be cloned in the target output folder.
+// 1. outputPath: Where the gitops resources are
+// 2. repoPathOverride: The default path is the componentName. Use this to override the default folder.
+// 3. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
+// 4. componentName: The component name corresponding to a single Component in an Application in AS. eg. component.Name
+// 5. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
+// 6. The branch to push to
+// 7. The path within the repository to generate the resources in
 func CommitAndPush(outputPath string, repoPathOverride string, remote string, componentName string, e Executor, branch string, commitMessage string) error {
 
 	invalidRemoteErr := util.ValidateRemote(remote)
@@ -116,25 +123,40 @@ func CommitAndPush(outputPath string, repoPathOverride string, remote string, co
 	return nil
 }
 
-func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, doPush bool, createdBy string, commonStorage *corev1.PersistentVolumeClaim) error {
+// GenerateAndPush generates a new gitops folder with one component, and optionally pushes to Git. Note: this does not
+// clone an existing gitops repo.
+// 1. outputPath: Where the gitops resources are
+// 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
+// 3. options: Options for resource generation
+// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
+// 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 6. The branch to push to
+// 7. Optionally push to the GitOps repository or not.  Default is not to push.
+// 8. createdBy: Use a unique name to identify that clients are generating the GitOps repository. Default is "application-service" and should be overwritten.
+func GenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, e Executor, appFs afero.Afero, branch string, doPush bool, createdBy string) error {
 	CreatedBy = createdBy
 
-	componentName := component.Spec.ComponentName
-	repoPath := filepath.Join(outputPath, component.Spec.Application)
+	componentName := options.Name
+	repoPath := filepath.Join(outputPath, options.Application)
 
 	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := repoPath
 
-	gitHostAccessToken := component.Spec.Secret
-	gitOpsRepoURL := component.Spec.Source.GitSource.URL
-
+	gitHostAccessToken := options.Secret
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
-	if err := Generate(appFs, gitopsFolder, componentPath, component); err != nil {
+	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
 
 	// Commit the changes and push
 	if doPush {
+		gitOpsRepoURL := ""
+		if options.GitSource != nil {
+			gitOpsRepoURL = options.GitSource.URL
+		}
+		if gitOpsRepoURL == "" {
+			return fmt.Errorf("the GitOps repo URL is not set")
+		}
 		u, err := url.Parse(gitOpsRepoURL)
 		if err != nil {
 			return fmt.Errorf("failed to parse GitOps repo URL %q: %w", gitOpsRepoURL, err)
@@ -202,14 +224,28 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 }
 
 // GenerateOverlaysAndPush generates the overlays kustomize from App Env Snapshot Binding Spec
-func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
+// 1. outputPath: Where to output the gitops resources to
+// 2. clone: Optionally clone the repository first
+// 3. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
+// 4. options: Options for resource generation
+// 5. applicationName: The name of the application
+// 6. environmentName: The name of the environment
+// 7. imageName: The image name of the source
+// 8  namespace: The namespace of the component. This is used in as the namespace of the deployment yaml.
+// 9. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
+// 10. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 11. The branch to push to
+// 12. The path within the repository to generate the resources in
+// 13. Push the changes to the repository or not.
+// 14. The gitops config containing the build bundle;
+func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 
 	invalidRemoteErr := util.ValidateRemote(remote)
 	if invalidRemoteErr != nil {
 		return invalidRemoteErr
 	}
 
-	componentName := component.Name
+	componentName := options.Name
 	repoPath := filepath.Join(outputPath, applicationName)
 
 	if clone {
@@ -228,7 +264,7 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentEnvOverlaysPath := filepath.Join(gitopsFolder, "components", componentName, "overlays", environmentName)
-	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, component, environment, imageName, namespace, componentGeneratedResources); err != nil {
+	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, options, imageName, namespace, componentGeneratedResources); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in overlays dir %q for component %q: %s", componentEnvOverlaysPath, componentName, err)
 	}
 
@@ -241,11 +277,12 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 // RemoveAndPush takes in the following args and updates the gitops resources by removing the given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
-// 3. component: The component name corresponding to a single Component in an Application in AS. eg. component.Name
+// 3. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
 // 7. The path within the repository to generate the resources in
+// 8. Optionally push the changes to the repository
 func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
 
 	invalidRemoteErr := util.ValidateRemote(remote)
@@ -288,6 +325,7 @@ func NewCmdExecutor() CmdExecutor {
 type CmdExecutor struct {
 }
 
+// Execute does an exec.Command on the specified command
 func (e CmdExecutor) Execute(baseDir, command string, args ...string) ([]byte, error) {
 	c := exec.Command(command, args...)
 	c.Dir = baseDir
