@@ -31,7 +31,7 @@ import (
 )
 
 func TestCloneGenerateAndPush(t *testing.T) {
-	repo := "git@github.com:testing/testing.git"
+	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
 	componentName := "test-component"
@@ -479,7 +479,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: "failed push remote to repository \"git@github.com:testing/testing.git\" \"test output1\": Fatal error",
+			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 		{
 			name:      "gitops generate failure",
@@ -557,7 +557,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 }
 
 func TestGenerateOverlaysAndPush(t *testing.T) {
-	repo := "git@github.com:testing/testing.git"
+	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-application"
 	componentName := "test-component"
@@ -962,7 +962,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: "failed push remote to repository \"git@github.com:testing/testing.git\" \"test output1\": Fatal error",
+			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 		{
 			name:            "gitops generate failure",
@@ -1016,7 +1016,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 }
 
 func TestRemoveAndPush(t *testing.T) {
-	repo := "git@github.com:testing/testing.git"
+	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
 	componentPath := "/fake/path/test-component/components/test-component"
@@ -1464,7 +1464,7 @@ func TestRemoveAndPush(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: "failed push remote to repository \"git@github.com:testing/testing.git\" \"test output1\": Fatal error",
+			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 	}
 
@@ -1519,7 +1519,7 @@ func TestExecute(t *testing.T) {
 }
 
 func TestGenerateAndPush(t *testing.T) {
-	repo := "http://github.com/testing/testing.git"
+	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	component := gitopsv1alpha1.Component{
 		Spec: gitopsv1alpha1.ComponentSpec{

@@ -18,6 +18,7 @@ package gitops
 import (
 	"context"
 	"fmt"
+	"github.com/redhat-developer/gitops-generator/pkg/util"
 	"net/url"
 	"os/exec"
 	"path/filepath"
@@ -39,8 +40,8 @@ type Executor interface {
 
 // CloneGenerateAndPush takes in the following args and generates the gitops resources for a given component
 // 1. outputPath: Where to output the gitops resources to
-// 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
-// 2. component: A component struct corresponding to a single Component in an Application in AS
+// 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
+// 3. component: A component struct corresponding to a single Component in an Application in AS
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
@@ -49,6 +50,12 @@ type Executor interface {
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
 func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.Component, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
 	componentName := component.Name
+
+	invalidRemoteErr := util.ValidateRemote(remote)
+	if invalidRemoteErr != nil {
+		return invalidRemoteErr
+	}
+
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
@@ -80,6 +87,12 @@ func CloneGenerateAndPush(outputPath string, remote string, component gitopsv1al
 }
 
 func CommitAndPush(outputPath string, repoPathOverride string, remote string, componentName string, e Executor, branch string, commitMessage string) error {
+
+	invalidRemoteErr := util.ValidateRemote(remote)
+	if invalidRemoteErr != nil {
+		return invalidRemoteErr
+	}
+
 	repoPath := filepath.Join(outputPath, componentName)
 	if repoPathOverride != "" {
 		repoPath = filepath.Join(outputPath, repoPathOverride)
@@ -190,6 +203,12 @@ func GenerateAndPush(outputPath string, remote string, component gitopsv1alpha1.
 
 // GenerateOverlaysAndPush generates the overlays kustomize from App Env Snapshot Binding Spec
 func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, component gitopsv1alpha1.BindingComponentConfiguration, environment gitopsv1alpha1.Environment, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
+
+	invalidRemoteErr := util.ValidateRemote(remote)
+	if invalidRemoteErr != nil {
+		return invalidRemoteErr
+	}
+
 	componentName := component.Name
 	repoPath := filepath.Join(outputPath, applicationName)
 
@@ -221,13 +240,19 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, compo
 
 // RemoveAndPush takes in the following args and updates the gitops resources by removing the given component
 // 1. outputPath: Where to output the gitops resources to
-// 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
-// 2. component: The component name corresponding to a single Component in an Application in AS. eg. component.Name
+// 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
+// 3. component: The component name corresponding to a single Component in an Application in AS. eg. component.Name
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
 // 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
 // 6. The branch to push to
 // 7. The path within the repository to generate the resources in
 func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
+
+	invalidRemoteErr := util.ValidateRemote(remote)
+	if invalidRemoteErr != nil {
+		return invalidRemoteErr
+	}
+
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
