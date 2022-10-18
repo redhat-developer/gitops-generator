@@ -240,9 +240,11 @@ func GenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.Ge
 // 14. The gitops config containing the build bundle;
 func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, e Executor, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 
-	invalidRemoteErr := util.ValidateRemote(remote)
-	if invalidRemoteErr != nil {
-		return invalidRemoteErr
+	if clone || doPush {
+		invalidRemoteErr := util.ValidateRemote(remote)
+		if invalidRemoteErr != nil {
+			return invalidRemoteErr
+		}
 	}
 
 	componentName := options.Name
