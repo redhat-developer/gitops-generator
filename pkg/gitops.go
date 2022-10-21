@@ -18,11 +18,12 @@ package gitops
 import (
 	"context"
 	"fmt"
-	"github.com/redhat-developer/gitops-generator/pkg/util"
 	"net/url"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/redhat-developer/gitops-generator/pkg/util"
 
 	"github.com/jenkins-x/go-scm/scm"
 	"github.com/jenkins-x/go-scm/scm/factory"
@@ -276,45 +277,61 @@ func GenerateOverlaysAndPush(outputPath string, clone bool, remote string, optio
 	return nil
 }
 
-// RemoveAndPush takes in the following args and updates the gitops resources by removing the given component
+// GitRemoveComponent clones the repo, removes the component, and pushes the changes back to the repository. It takes in the following args and updates the gitops resources by removing the given component
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
 // 3. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
 // 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
-// 6. The branch to push to
-// 7. The path within the repository to generate the resources in
-// 8. Optionally push the changes to the repository
-func RemoveAndPush(outputPath string, remote string, componentName string, e Executor, appFs afero.Afero, branch string, context string, doPush bool) error {
+// 5. The branch to push to
+// 6. The path within the repository to generate the resources in
+func GitRemoveComponent(outputPath string, remote string, componentName string, e Executor, branch string, context string) error {
+	if cloneError := CloneRepo(outputPath, remote, componentName, e, branch); cloneError != nil {
+		return cloneError
+	}
+	if removeComponentError := RemoveComponent(outputPath, componentName, e, context); removeComponentError != nil {
+		return removeComponentError
+	}
+	return CommitAndPush(outputPath, "", remote, componentName, e, branch, fmt.Sprintf("Removed component %s", componentName))
+}
 
+// CloneRepo clones the repo, and switches to the branch
+// 1. outputPath: Where to output the gitops resources to
+// 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
+// 3. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
+// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
+// 5. The branch to push to switch to
+func CloneRepo(outputPath string, remote string, componentName string, e Executor, branch string) error {
 	invalidRemoteErr := util.ValidateRemote(remote)
 	if invalidRemoteErr != nil {
 		return invalidRemoteErr
 	}
 
+	repoPath := filepath.Join(outputPath, componentName)
+
 	if out, err := e.Execute(outputPath, "git", "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
-
-	repoPath := filepath.Join(outputPath, componentName)
-
 	// Checkout the specified branch
 	if _, err := e.Execute(repoPath, "git", "switch", branch); err != nil {
 		if out, err := e.Execute(repoPath, "git", "checkout", "-b", branch); err != nil {
 			return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
 		}
 	}
+	return nil
+}
 
+// RemoveComponent removes the component from the local folder.  This expects the git repo to be already cloned
+// 1. outputPath: Where the gitops repo contents have been cloned
+// 2. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
+// 3. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
+// 4. The path within the repository to generate the resources in
+func RemoveComponent(outputPath string, componentName string, e Executor, context string) error {
+	repoPath := filepath.Join(outputPath, componentName)
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName)
 	if out, err := e.Execute(repoPath, "rm", "-rf", componentPath); err != nil {
 		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", componentPath, repoPath, string(out), err)
 	}
-
-	if doPush {
-		return CommitAndPush(outputPath, "", remote, componentName, e, branch, fmt.Sprintf("Removed component %s", componentName))
-	}
-
 	return nil
 }
 

@@ -1003,7 +1003,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 	}
 }
 
-func TestRemoveAndPush(t *testing.T) {
+func TestGitRemoveComponent(t *testing.T) {
 	repo := "https://github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
@@ -1460,7 +1460,7 @@ func TestRemoveAndPush(t *testing.T) {
 				return
 			}
 
-			err := RemoveAndPush(outputPath, repo, tt.component.Name, e, tt.fs, "main", "/", true)
+			err := GitRemoveComponent(outputPath, repo, tt.component.Name, e, "main", "/")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -1469,6 +1469,502 @@ func TestRemoveAndPush(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want, e.Executed, "command executed should be equal")
+		})
+	}
+}
+
+func TestRemoveComponent(t *testing.T) {
+	repo := "https://github.com/testing/testing.git"
+	outputPath := "/fake/path"
+	repoPath := "/fake/path/test-component"
+	componentPath := "/fake/path/test-component/components/test-component"
+	componentBasePath := "/fake/path/test-component/components/test-component/base"
+	componentName := "test-component"
+	component := gitopsv1alpha1.GeneratorOptions{
+		GitSource: &gitopsv1alpha1.GitSource{
+			URL: repo,
+		},
+		TargetPort: 5000,
+	}
+	component.Name = "test-component"
+	fs := ioutils.NewMemoryFilesystem()
+
+	tests := []struct {
+		name                string
+		fs                  afero.Afero
+		component           gitopsv1alpha1.GeneratorOptions
+		errors              *testutils.ErrorStack
+		outputs             [][]byte
+		want                []testutils.Execution
+		wantCloneErrString  string
+		wantRemoveErrString string
+		wantPushErrString   string
+	}{
+		{
+			name:      "No errors",
+			fs:        fs,
+			component: component,
+			errors:    &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name:      "Git clone failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					nil,
+					errors.New("test error"),
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+			},
+			wantCloneErrString: "test error",
+		},
+		{
+			name:      "Git switch failure, git checkout failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Permission denied"),
+					errors.New("Fatal error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"checkout", "-b", "main"},
+				},
+			},
+			wantCloneErrString: "failed to checkout branch \"main\" in \"/fake/path/test-component\" \"test output1\": Permission denied",
+		},
+		{
+			name:      "Git switch failure, git checkout success",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					nil,
+					errors.New("test error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+				[]byte("test output8"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"checkout", "-b", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+			wantCloneErrString: "",
+		},
+		{
+			name:      "rm -rf failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Permission Denied"),
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+			},
+			wantRemoveErrString: "failed to delete \"/fake/path/test-component/components/test-component\" folder in repository in \"/fake/path/test-component\" \"test output1\": Permission Denied",
+		},
+		{
+			name:      "git add failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+			},
+			wantPushErrString: "failed to add files for component \"test-component\" to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
+		},
+		{
+			name:      "git diff failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Permission Denied"),
+					nil,
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+			},
+			wantPushErrString: "failed to check git diff in repository \"/fake/path/test-component\" \"test output1\": Permission Denied",
+		},
+		{
+			name:      "git commit failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
+				},
+			},
+			wantPushErrString: "failed to commit files to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
+		},
+		{
+			name:      "git push failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("Fatal error"),
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", componentPath},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+			wantPushErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := testutils.NewMockExecutor(tt.outputs...)
+			e.Errors = tt.errors
+
+			if err := Generate(fs, repoPath, componentBasePath, tt.component); err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+
+			err := CloneRepo(outputPath, repo, tt.component.Name, e, "main")
+
+			if tt.wantCloneErrString != "" {
+				testutils.AssertErrorMatch(t, tt.wantCloneErrString, err)
+			} else {
+				testutils.AssertNoError(t, err)
+			}
+
+			if tt.wantCloneErrString == "" {
+
+				err = RemoveComponent(outputPath, tt.component.Name, e, "/")
+
+				if tt.wantRemoveErrString != "" {
+					testutils.AssertErrorMatch(t, tt.wantRemoveErrString, err)
+				} else {
+					testutils.AssertNoError(t, err)
+				}
+
+				if tt.wantRemoveErrString == "" {
+
+					err = CommitAndPush(outputPath, "", repo, tt.component.Name, e, "main", fmt.Sprintf("Removed component %s", componentName))
+
+					if tt.wantPushErrString != "" {
+						testutils.AssertErrorMatch(t, tt.wantPushErrString, err)
+					} else {
+						testutils.AssertNoError(t, err)
+					}
+
+				}
+			}
+
+			assert.Equal(t, tt.want, e.Executed, "command executed should be equal")
+
 		})
 	}
 }
