@@ -18,17 +18,18 @@ package gitops
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
 	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 )
+
+var originalExecute = execute
 
 func TestCloneGenerateAndPush(t *testing.T) {
 	repo := "https://github.com/testing/testing.git"
@@ -552,6 +553,9 @@ func TestCloneGenerateAndPush(t *testing.T) {
 			assert.Equal(t, tt.want, executedCmds, "command executed should be equal")
 		})
 	}
+
+	execute = originalExecute
+
 }
 
 func TestGenerateOverlaysAndPush(t *testing.T) {
@@ -1018,6 +1022,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 			assert.Equal(t, tt.want, executedCmds, "command executed should be equal")
 		})
 	}
+	execute = originalExecute
 }
 
 func TestGitRemoveComponent(t *testing.T) {
@@ -1496,6 +1501,8 @@ func TestGitRemoveComponent(t *testing.T) {
 			assert.Equal(t, tt.want, executedCmds, "command executed should be equal")
 		})
 	}
+
+	execute = originalExecute
 }
 
 func TestRemoveComponent(t *testing.T) {
@@ -1998,6 +2005,7 @@ func TestRemoveComponent(t *testing.T) {
 
 		})
 	}
+	execute = originalExecute
 }
 
 func TestExecute(t *testing.T) {
@@ -2051,6 +2059,7 @@ func TestExecute(t *testing.T) {
 			}
 		})
 	}
+	execute = originalExecute
 }
 
 func TestGenerateAndPush(t *testing.T) {
@@ -2088,9 +2097,10 @@ func TestGenerateAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
-			var output []byte
-			var execErr error
+
 			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
+				var output []byte
+				var execErr error
 				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
 				return output, execErr
 			}
@@ -2106,6 +2116,7 @@ func TestGenerateAndPush(t *testing.T) {
 			assert.Equal(t, tt.want, executedCmds, "command executed should be equal")
 		})
 	}
+	execute = originalExecute
 }
 
 func TestGetCommitIDFromRepo(t *testing.T) {
@@ -2119,6 +2130,7 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+
 	commitID, err := getCommitIDFromDotGit(tempDir)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2182,6 +2194,7 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 			}
 		})
 	}
+	execute = originalExecute
 }
 
 // createEmptyGitRepository generates an empty git repository under the specified folder
@@ -2202,7 +2215,7 @@ func createEmptyGitRepository(repoPath string) error {
 func getCommitIDFromDotGit(repoPath string) (string, error) {
 	fs := ioutils.NewFilesystem()
 	var fileBytes []byte
-	fileBytes, err := fs.ReadFile(filepath.Join(repoPath, ".git", "refs", "heads", "master"))
+	fileBytes, err := fs.ReadFile(filepath.Join(repoPath, ".git", "refs", "heads", "main"))
 	if err != nil {
 		return "", err
 	}
