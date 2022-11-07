@@ -16,52 +16,15 @@
 package testutils
 
 import (
-	"fmt"
 	"regexp"
-	"strings"
 	"sync"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
-
-type MockExecutor struct {
-	Outputs  *OutputStack
-	Errors   *ErrorStack
-	Executed []Execution
-}
 
 type Execution struct {
 	BaseDir string
 	Command string
 	Args    []string
-}
-
-func NewMockExecutor(outputs ...[]byte) *MockExecutor {
-	return &MockExecutor{
-		Outputs:  NewOutputs(outputs...),
-		Errors:   NewErrors(),
-		Executed: []Execution{},
-	}
-}
-
-func (m *MockExecutor) Execute(basedir, command string, args ...string) ([]byte, error) {
-	m.Executed = append(m.Executed, Execution{BaseDir: basedir, Command: command, Args: args})
-	if command == "git" && len(args) > 0 && args[0] == "rev-parse" {
-		if strings.Contains(basedir, "test-git-error") {
-			return []byte(""), fmt.Errorf("unable to retrive git commit id")
-		} else {
-			return []byte("ca82a6dff817ec66f44342007202690a93763949"), m.Errors.Pop()
-		}
-	} else {
-		return m.Outputs.Pop(), m.Errors.Pop()
-	}
-}
-
-func (m *MockExecutor) AssertCommandsExecuted(t *testing.T, want []Execution) {
-	if diff := cmp.Diff(want, m.Executed); diff != "" {
-		t.Fatalf("failed to push the repository:\n%s", diff)
-	}
 }
 
 type ErrorStack struct {
