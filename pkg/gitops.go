@@ -34,9 +34,6 @@ import (
 
 const defaultRepoDescription = "Bootstrapped GitOps Repository based on Components"
 
-type Executor interface {
-	Execute(baseDir, command string, args ...string) ([]byte, error)
-}
 type CommandType string
 
 const (

@@ -535,12 +535,8 @@ func TestCloneGenerateAndPush(t *testing.T) {
 
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
+
+			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
 			err := CloneGenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", "/", true)
 
@@ -996,12 +992,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
 
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
+			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
 			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, tt.fs, "main", "/", true, generatedResources)
 
@@ -1478,12 +1469,7 @@ func TestGitRemoveComponent(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
 
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
+			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
 			if err := Generate(fs, repoPath, componentBasePath, tt.component); err != nil {
 				t.Errorf("unexpected error %v", err)
@@ -1958,12 +1944,8 @@ func TestRemoveComponent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
+
+			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
 			if err := Generate(fs, repoPath, componentBasePath, tt.component); err != nil {
 				t.Errorf("unexpected error %v", err)
@@ -2035,12 +2017,7 @@ func TestExecute(t *testing.T) {
 			outputStack := testutils.NewOutputs()
 			executedCmds := []testutils.Execution{}
 
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, testutils.NewErrors(), executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
+			execute = newTestExecute(outputStack, testutils.NewErrors(), &executedCmds)
 
 			_, err := execute(tt.outputPath, tt.command, tt.args)
 
@@ -2098,13 +2075,7 @@ func TestGenerateAndPush(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
 
-			execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-				var output []byte
-				var execErr error
-				output, execErr, executedCmds = mockExecute(outputStack, tt.errors, executedCmds, baseDir, cmd, args...)
-				return output, execErr
-			}
-
+			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 			err := GenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", false, "KAM CLI")
 
 			if tt.wantErrString != "" {
@@ -2173,12 +2144,7 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 				outputStack := testutils.NewOutputs()
 				executedCmds := []testutils.Execution{}
 
-				execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
-					var output []byte
-					var execErr error
-					output, execErr, executedCmds = mockExecute(outputStack, testutils.NewErrors(), executedCmds, baseDir, cmd, args...)
-					return output, execErr
-				}
+				execute = newTestExecute(outputStack, testutils.NewErrors(), &executedCmds)
 			}
 
 			commitID, err := GetCommitIDFromRepo(fs, tt.repoPath)
@@ -2222,9 +2188,9 @@ func getCommitIDFromDotGit(repoPath string) (string, error) {
 	return string(fileBytes), nil
 }
 
-func mockExecute(outputStack *testutils.OutputStack, errorStack *testutils.ErrorStack, executedCmds []testutils.Execution, baseDir string, cmd CommandType, args ...string) ([]byte, error, []testutils.Execution) {
+func mockExecute(outputStack *testutils.OutputStack, errorStack *testutils.ErrorStack, executedCmds *[]testutils.Execution, baseDir string, cmd CommandType, args ...string) ([]byte, error, *[]testutils.Execution) {
 	if cmd == gitCommand || cmd == rmCommand {
-		executedCmds = append(executedCmds, testutils.Execution{BaseDir: baseDir, Command: string(cmd), Args: args})
+		*executedCmds = append(*executedCmds, testutils.Execution{BaseDir: baseDir, Command: string(cmd), Args: args})
 		if len(args) > 0 && args[0] == "rev-parse" {
 			if strings.Contains(baseDir, "test-git-error") {
 				return []byte(""), fmt.Errorf("unable to retrive git commit id"), executedCmds
@@ -2237,4 +2203,13 @@ func mockExecute(outputStack *testutils.OutputStack, errorStack *testutils.Error
 	}
 
 	return []byte(""), fmt.Errorf("Unsupported command \"%s\" ", string(cmd)), executedCmds
+}
+
+func newTestExecute(outputStack *testutils.OutputStack, errorStack *testutils.ErrorStack, executedCmds *[]testutils.Execution) func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
+	return func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
+		var output []byte
+		var execErr error
+		output, execErr, executedCmds = mockExecute(outputStack, errorStack, executedCmds, baseDir, cmd, args...)
+		return output, execErr
+	}
 }
