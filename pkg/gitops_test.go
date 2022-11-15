@@ -46,6 +46,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
 	readOnlyFs := ioutils.NewReadOnlyFs()
+	generator := NewGitopsGen()
 
 	tests := []struct {
 		name          string
@@ -538,7 +539,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			err := CloneGenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", "/", true)
+			err := generator.CloneGenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", "/", true)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -570,7 +571,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
 	readOnlyFs := ioutils.NewReadOnlyFs()
-
+	generator := NewGitopsGen()
 	tests := []struct {
 		name            string
 		fs              afero.Afero
@@ -994,7 +995,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			err := GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, tt.fs, "main", "/", true, generatedResources)
+			err := generator.GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, tt.fs, "main", "/", true, generatedResources)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -1031,6 +1032,7 @@ func TestGitRemoveComponent(t *testing.T) {
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
+	generator := NewGitopsGen()
 
 	tests := []struct {
 		name          string
@@ -1476,7 +1478,7 @@ func TestGitRemoveComponent(t *testing.T) {
 				return
 			}
 
-			err := GitRemoveComponent(outputPath, repo, tt.component.Name, "main", "/")
+			err := generator.GitRemoveComponent(outputPath, repo, tt.component.Name, "main", "/")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -1506,7 +1508,7 @@ func TestRemoveComponent(t *testing.T) {
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
-
+	generator := NewGitopsGen()
 	tests := []struct {
 		name                string
 		fs                  afero.Afero
@@ -1952,7 +1954,7 @@ func TestRemoveComponent(t *testing.T) {
 				return
 			}
 
-			err := CloneRepo(outputPath, repo, tt.component.Name, "main")
+			err := generator.CloneRepo(outputPath, repo, tt.component.Name, "main")
 
 			if tt.wantCloneErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantCloneErrString, err)
@@ -1962,7 +1964,7 @@ func TestRemoveComponent(t *testing.T) {
 
 			if tt.wantCloneErrString == "" {
 
-				err = RemoveComponent(outputPath, tt.component.Name, "/")
+				err = generator.RemoveComponent(outputPath, tt.component.Name, "/")
 
 				if tt.wantRemoveErrString != "" {
 					testutils.AssertErrorMatch(t, tt.wantRemoveErrString, err)
@@ -1972,7 +1974,7 @@ func TestRemoveComponent(t *testing.T) {
 
 				if tt.wantRemoveErrString == "" {
 
-					err = CommitAndPush(outputPath, "", repo, tt.component.Name, "main", fmt.Sprintf("Removed component %s", componentName))
+					err = generator.CommitAndPush(outputPath, "", repo, tt.component.Name, "main", fmt.Sprintf("Removed component %s", componentName))
 
 					if tt.wantPushErrString != "" {
 						testutils.AssertErrorMatch(t, tt.wantPushErrString, err)
@@ -2000,7 +2002,7 @@ func TestExecute(t *testing.T) {
 	}{
 		{
 			name:    "Simple command to execute",
-			command: gitCommand,
+			command: GitCommand,
 			args:    "help",
 			wantErr: nil,
 		},
@@ -2051,7 +2053,7 @@ func TestGenerateAndPush(t *testing.T) {
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
-
+	generator := NewGitopsGen()
 	tests := []struct {
 		name          string
 		fs            afero.Afero
@@ -2076,7 +2078,7 @@ func TestGenerateAndPush(t *testing.T) {
 			executedCmds := []testutils.Execution{}
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
-			err := GenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", false, "KAM CLI")
+			err := generator.GenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", false, "KAM CLI")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -2107,6 +2109,7 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	generator := NewGitopsGen()
 	tests := []struct {
 		name        string
 		useMockExec bool
@@ -2147,7 +2150,7 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 				execute = newTestExecute(outputStack, testutils.NewErrors(), &executedCmds)
 			}
 
-			commitID, err := GetCommitIDFromRepo(fs, tt.repoPath)
+			commitID, err := generator.GetCommitIDFromRepo(fs, tt.repoPath)
 
 			if err != nil && !tt.wantErr {
 				t.Errorf("TestGetCommitIDFromRepo() unexpected error: %s", err.Error())
@@ -2166,12 +2169,12 @@ func TestGetCommitIDFromRepo(t *testing.T) {
 // createEmptyGitRepository generates an empty git repository under the specified folder
 func createEmptyGitRepository(repoPath string) error {
 	// Initialize the Git repository
-	if out, err := execute(repoPath, gitCommand, "init"); err != nil {
+	if out, err := execute(repoPath, GitCommand, "init"); err != nil {
 		return fmt.Errorf("Unable to intialize git repository in %q %q: %s", repoPath, out, err)
 	}
 
 	// Create an empty commit
-	if out, err := execute(repoPath, gitCommand, "-c", "user.name='Test User'", "-c", "user.email='test@test.org'", "commit", "--allow-empty", "-m", "\"Empty commit\""); err != nil {
+	if out, err := execute(repoPath, GitCommand, "-c", "user.name='Test User'", "-c", "user.email='test@test.org'", "commit", "--allow-empty", "-m", "\"Empty commit\""); err != nil {
 		return fmt.Errorf("Unable to create empty commit in %q %q: %s", repoPath, out, err)
 	}
 	return nil
@@ -2189,7 +2192,7 @@ func getCommitIDFromDotGit(repoPath string) (string, error) {
 }
 
 func mockExecute(outputStack *testutils.OutputStack, errorStack *testutils.ErrorStack, executedCmds *[]testutils.Execution, baseDir string, cmd CommandType, args ...string) ([]byte, error, *[]testutils.Execution) {
-	if cmd == gitCommand || cmd == rmCommand {
+	if cmd == GitCommand || cmd == RmCommand {
 		*executedCmds = append(*executedCmds, testutils.Execution{BaseDir: baseDir, Command: string(cmd), Args: args})
 		if len(args) > 0 && args[0] == "rev-parse" {
 			if strings.Contains(baseDir, "test-git-error") {
