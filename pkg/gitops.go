@@ -53,6 +53,14 @@ type Generator interface {
 	GetCommitIDFromRepo(fs afero.Afero, repoPath string) (string, error)
 }
 
+// NewGitopsGen returns a Generator implementation
+func NewGitopsGen() Gen {
+	return Gen{}
+}
+
+type Gen struct {
+}
+
 // expose as a global variable for the purpose of running mock tests
 // only "git" and "rm" are supported
 var execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
@@ -373,12 +381,4 @@ func (s Gen) GetCommitIDFromRepo(fs afero.Afero, repoPath string) (string, error
 		return "", fmt.Errorf("failed to retrieve commit id for repository in %q %q: %s", repoPath, string(out), err)
 	}
 	return string(out), nil
-}
-
-// NewGitopsGen returns a Generator implementation
-func NewGitopsGen() Gen {
-	return Gen{}
-}
-
-type Gen struct {
 }
