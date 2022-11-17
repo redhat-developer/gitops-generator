@@ -49,7 +49,6 @@ type Generator interface {
 	GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error
 	GitRemoveComponent(outputPath string, remote string, componentName string, branch string, context string) error
 	CloneRepo(outputPath string, remote string, componentName string, branch string) error
-	RemoveComponent(outputPath string, componentName string, context string) error
 	GetCommitIDFromRepo(fs afero.Afero, repoPath string) (string, error)
 }
 
@@ -63,6 +62,7 @@ type Gen struct {
 
 // expose as a global variable for the purpose of running mock tests
 // only "git" and "rm" are supported
+/* #nosec G204 -- used internally to execute various gitops actions and eventual cleanup of artifacts.  Calling methods validate user input to ensure commands are used appropriately */
 var execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, error) {
 	if cmd == GitCommand || cmd == RmCommand {
 		c := exec.Command(string(cmd), args...)
@@ -78,11 +78,10 @@ var execute = func(baseDir string, cmd CommandType, args ...string) ([]byte, err
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
 // 3. options: Options for resource generation
-// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
-// 6. The branch to push to
-// 7. The path within the repository to generate the resources in
-// 8. The gitops config containing the build bundle;
+// 4. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 5. The branch to push to
+// 6. The path within the repository to generate the resources in
+// 7. The gitops config containing the build bundle;
 // Adapted from https://github.com/redhat-developer/kam/blob/master/pkg/pipelines/utils.go#L79
 func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, appFs afero.Afero, branch string, context string, doPush bool) error {
 	componentName := options.Name
@@ -127,9 +126,8 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 // 2. repoPathOverride: The default path is the componentName. Use this to override the default folder.
 // 3. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
 // 4. componentName: The component name corresponding to a single Component in an Application in AS. eg. component.Name
-// 5. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 6. The branch to push to
-// 7. The path within the repository to generate the resources in
+// 5. The branch to push to
+// 6. The path within the repository to generate the resources in
 func (s Gen) CommitAndPush(outputPath string, repoPathOverride string, remote string, componentName string, branch string, commitMessage string) error {
 
 	invalidRemoteErr := util.ValidateRemote(remote)
@@ -166,14 +164,12 @@ func (s Gen) CommitAndPush(outputPath string, repoPathOverride string, remote st
 // 1. outputPath: Where the gitops resources are
 // 2. remote: A string of the form https://$token@github.com/<org>/<repo>. Corresponds to the component's gitops repository
 // 3. options: Options for resource generation
-// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 5. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
-// 6. The branch to push to
-// 7. Optionally push to the GitOps repository or not.  Default is not to push.
-// 8. createdBy: Use a unique name to identify that clients are generating the GitOps repository. Default is "application-service" and should be overwritten.
+// 4. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 5. The branch to push to
+// 6. Optionally push to the GitOps repository or not.  Default is not to push.
+// 7. createdBy: Use a unique name to identify that clients are generating the GitOps repository. Default is "application-service" and should be overwritten.
 func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, appFs afero.Afero, branch string, doPush bool, createdBy string) error {
 	CreatedBy = createdBy
-
 	componentName := options.Name
 	repoPath := filepath.Join(outputPath, options.Application)
 
@@ -188,6 +184,12 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 
 	// Commit the changes and push
 	if doPush {
+
+		invalidRemoteErr := util.ValidateRemote(remote)
+		if invalidRemoteErr != nil {
+			return invalidRemoteErr
+		}
+
 		gitOpsRepoURL := ""
 		if options.GitSource != nil {
 			gitOpsRepoURL = options.GitSource.URL
@@ -270,12 +272,11 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 // 6. environmentName: The name of the environment
 // 7. imageName: The image name of the source
 // 8  namespace: The namespace of the component. This is used in as the namespace of the deployment yaml.
-// 9. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 10. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
-// 11. The branch to push to
-// 12. The path within the repository to generate the resources in
-// 13. Push the changes to the repository or not.
-// 14. The gitops config containing the build bundle;
+// 9. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 10. The branch to push to
+// 11. The path within the repository to generate the resources in
+// 12. Push the changes to the repository or not.
+// 13. The gitops config containing the build bundle;
 func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 
 	if clone || doPush {
@@ -318,14 +319,13 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
 // 3. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
-// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 5. The branch to push to
-// 6. The path within the repository to generate the resources in
+// 4. The branch to push to
+// 5. The path within the repository to generate the resources in
 func (s Gen) GitRemoveComponent(outputPath string, remote string, componentName string, branch string, context string) error {
 	if cloneError := s.CloneRepo(outputPath, remote, componentName, branch); cloneError != nil {
 		return cloneError
 	}
-	if removeComponentError := s.RemoveComponent(outputPath, componentName, context); removeComponentError != nil {
+	if removeComponentError := removeComponent(outputPath, componentName, context); removeComponentError != nil {
 		return removeComponentError
 	}
 
@@ -336,8 +336,7 @@ func (s Gen) GitRemoveComponent(outputPath string, remote string, componentName 
 // 1. outputPath: Where to output the gitops resources to
 // 2. remote: A string of the form https://$token@<domain>/<org>/<repo>, where <domain> is either github.com or gitlab.com and $token is optional. Corresponds to the component's gitops repository
 // 3. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
-// 4. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 5. The branch to push to switch to
+// 4. The branch to push to switch to
 func (s Gen) CloneRepo(outputPath string, remote string, componentName string, branch string) error {
 	invalidRemoteErr := util.ValidateRemote(remote)
 	if invalidRemoteErr != nil {
@@ -358,12 +357,11 @@ func (s Gen) CloneRepo(outputPath string, remote string, componentName string, b
 	return nil
 }
 
-// RemoveComponent removes the component from the local folder.  This expects the git repo to be already cloned
+// removeComponent removes the component from the local folder.  This expects the git repo to be already cloned
 // 1. outputPath: Where the gitops repo contents have been cloned
 // 2. componentName: The component name corresponding to a single Component in an Application. eg. component.Name
-// 3. The executor to use to execute the git commands (either gitops.executor or gitops.mockExecutor)
-// 4. The path within the repository to generate the resources in
-func (s Gen) RemoveComponent(outputPath string, componentName string, context string) error {
+// 3. The path within the repository to generate the resources in
+func removeComponent(outputPath string, componentName string, context string) error {
 	repoPath := filepath.Join(outputPath, componentName)
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName)

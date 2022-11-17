@@ -18,15 +18,16 @@ package gitops
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
 	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 var originalExecute = execute
@@ -1964,7 +1965,7 @@ func TestRemoveComponent(t *testing.T) {
 
 			if tt.wantCloneErrString == "" {
 
-				err = generator.RemoveComponent(outputPath, tt.component.Name, "/")
+				err = removeComponent(outputPath, tt.component.Name, "/")
 
 				if tt.wantRemoveErrString != "" {
 					testutils.AssertErrorMatch(t, tt.wantRemoveErrString, err)
