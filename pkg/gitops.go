@@ -121,6 +121,7 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
+	s.log.V(6).Info(fmt.Sprintf("GitOps resources generated under %s", componentPath))
 
 	if doPush {
 		s.log.V(6).Info("Pushing GitOps resources to repository")
