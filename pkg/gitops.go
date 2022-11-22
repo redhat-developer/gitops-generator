@@ -25,6 +25,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/redhat-developer/gitops-generator/pkg/util"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/jenkins-x/go-scm/scm"
 	"github.com/jenkins-x/go-scm/scm/factory"
@@ -55,7 +57,18 @@ type Generator interface {
 
 // NewGitopsGen returns a Generator implementation
 func NewGitopsGen() Gen {
-	return Gen{}
+	return Gen{
+		log: zap.New(zap.UseFlagOptions(&zap.Options{
+			Development: true,
+			TimeEncoder: zapcore.ISO8601TimeEncoder,
+		})),
+	}
+}
+
+func NewGitopsGenWithLogger(log logr.Logger) Gen {
+	return Gen{
+		log: log,
+	}
 }
 
 type Gen struct {
