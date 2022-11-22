@@ -58,7 +58,7 @@ type Generator interface {
 // NewGitopsGen returns a Generator implementation
 func NewGitopsGen() Gen {
 	return Gen{
-		log: zap.New(zap.UseFlagOptions(&zap.Options{
+		Log: zap.New(zap.UseFlagOptions(&zap.Options{
 			Development: true,
 			TimeEncoder: zapcore.ISO8601TimeEncoder,
 		})),
@@ -67,12 +67,12 @@ func NewGitopsGen() Gen {
 
 func NewGitopsGenWithLogger(log logr.Logger) Gen {
 	return Gen{
-		log: log,
+		Log: log,
 	}
 }
 
 type Gen struct {
-	log logr.Logger
+	Log logr.Logger
 }
 
 // expose as a global variable for the purpose of running mock tests
@@ -106,38 +106,38 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 		return invalidRemoteErr
 	}
 
-	s.log.V(6).Info("Cloning GitOps repository")
+	s.Log.V(6).Info("Cloning GitOps repository")
 	if out, err := execute(outputPath, GitCommand, "clone", remote, componentName); err != nil {
 		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
 	}
-	s.log.V(6).Info("GitOps repository cloned")
+	s.Log.V(6).Info("GitOps repository cloned")
 
 	repoPath := filepath.Join(outputPath, componentName)
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
 
 	// Checkout the specified branch
-	s.log.V(6).Info(fmt.Sprintf("Checking out branch %s", branch))
+	s.Log.V(6).Info(fmt.Sprintf("Checking out branch %s", branch))
 	if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
 		if out, err := execute(repoPath, GitCommand, "checkout", "-b", branch); err != nil {
 			return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
 		}
 	}
-	s.log.V(6).Info(fmt.Sprintf("Branch %s checked out", branch))
+	s.Log.V(6).Info(fmt.Sprintf("Branch %s checked out", branch))
 
 	if out, err := execute(repoPath, RmCommand, "-rf", filepath.Join("components", componentName, "base")); err != nil {
 		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", filepath.Join("components", componentName, "base"), repoPath, string(out), err)
 	}
 
 	// Generate the gitops resources and update the parent kustomize yaml file
-	s.log.V(6).Info(fmt.Sprintf("Generating GitOps resources under %s", componentPath))
+	s.Log.V(6).Info(fmt.Sprintf("Generating GitOps resources under %s", componentPath))
 	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
 		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
 	}
-	s.log.V(6).Info(fmt.Sprintf("GitOps resources generated under %s", componentPath))
+	s.Log.V(6).Info(fmt.Sprintf("GitOps resources generated under %s", componentPath))
 
 	if doPush {
-		s.log.V(6).Info("Pushing GitOps resources to repository")
+		s.Log.V(6).Info("Pushing GitOps resources to repository")
 		return s.CommitAndPush(outputPath, "", remote, componentName, branch, fmt.Sprintf("Generate GitOps base resources for component %s", componentName))
 	}
 	return nil
