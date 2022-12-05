@@ -38,6 +38,7 @@ func ValidateRemote(remote string) error {
 	return invalidRemoteMsg
 }
 
+/* #nosec G101 -- regex for remote url segment that can contain a token.  This is not a hardcoded token*/
 const tokenRegex = `(https:\/\/)(\w+)@`
 
 // SanitizeErrorMessage takes in a given error message and returns a new, sanitized error with things like tokens removed
