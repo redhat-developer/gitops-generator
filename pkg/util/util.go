@@ -18,6 +18,8 @@ package util
 import (
 	"errors"
 	"net/url"
+	"regexp"
+	"strings"
 )
 
 var invalidRemoteMsg = errors.New("remote URL is invalid or missing the https scheme and/or supported github.com or gitlab.com hosts")
@@ -34,4 +36,23 @@ func ValidateRemote(remote string) error {
 	}
 
 	return invalidRemoteMsg
+}
+
+const tokenRegex = `(https:\/\/)(\w+)@`
+
+// SanitizeErrorMessage takes in a given error message and returns a new, sanitized error with things like tokens removed
+func SanitizeErrorMessage(err error) error {
+	reg := regexp.MustCompile(tokenRegex)
+	matches := reg.FindAllStringSubmatch(err.Error(), -1)
+	newErrMsg := err.Error()
+
+	for _, v := range matches {
+		// check for length of 3 because this includes the string match for the entire regex and sub-matches to the two capturing groups
+		if len(v) == 3 {
+			// use newErrMsg in subsequent iterations to ensure multiple tokens in a message get redacted
+			newErrMsg = strings.Replace(newErrMsg, v[2], "<TOKEN>", 1)
+		}
+	}
+
+	return errors.New(newErrMsg)
 }

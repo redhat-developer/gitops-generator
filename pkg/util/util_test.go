@@ -15,6 +15,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -57,6 +58,50 @@ func TestValidateRemoteURL(t *testing.T) {
 			err := ValidateRemote(tt.remoteURL)
 			if err != tt.wantErr {
 				t.Errorf("ValidateRemote() error: expected %v got %v", tt.wantErr, err)
+			}
+		})
+	}
+
+}
+
+func TestSanitizeErrorMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{
+			name: "Error message with nothing to be sanitized",
+			err:  fmt.Errorf("Unable to create component, some error occurred"),
+			want: fmt.Errorf("Unable to create component, some error occurred"),
+		},
+		{
+			name: "Error message with token that needs to be sanitized",
+			err:  fmt.Errorf("failed clone repository \"https://ghp_fj3492danj924@github.com/fake/repo\""),
+			want: fmt.Errorf("failed clone repository \"https://<TOKEN>@github.com/fake/repo\""),
+		},
+		{
+			name: "Error message with multiple tokens that need to be sanitized",
+			err:  fmt.Errorf("failed clone repository \"https://ghp_fj3492danj924@github.com/fake/repo\" and \"https://ghu_fj3492danj924@github.com/fake/repo\""),
+			want: fmt.Errorf("failed clone repository \"https://<TOKEN>@github.com/fake/repo\" and \"https://<TOKEN>@github.com/fake/repo\""),
+		},
+		{
+			name: "Error error message with token outside of remote URL, nothing to be sanitized",
+			err:  fmt.Errorf("random error message with ghp_faketokensdffjfjfn"),
+			want: fmt.Errorf("random error message with ghp_faketokensdffjfjfn"),
+		},
+		{
+			name: "Error message with URL that does not have a token, nothing to be sanitized",
+			err:  fmt.Errorf("failed clone repository \"https://@github.com/fake/repo\""),
+			want: fmt.Errorf("failed clone repository \"https://@github.com/fake/repo\""),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sanitizedError := SanitizeErrorMessage(tt.err)
+			if sanitizedError.Error() != tt.want.Error() {
+				t.Errorf("SanitizeName() error: expected %v got %v", tt.want, sanitizedError)
 			}
 		})
 	}
