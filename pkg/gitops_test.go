@@ -2221,7 +2221,7 @@ func createEmptyGitRepository(repoPath string) error {
 func getCommitIDFromDotGit(repoPath string) (string, error) {
 	fs := ioutils.NewFilesystem()
 	var fileBytes []byte
-	fileBytes, err := fs.ReadFile(filepath.Join(repoPath, ".git", "refs", "heads", "main"))
+	fileBytes, err := fs.ReadFile(filepath.Join(repoPath, ".git", "refs", "heads", "master"))
 	if err != nil {
 		return "", err
 	}
