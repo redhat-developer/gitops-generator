@@ -108,7 +108,7 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 
 	s.Log.V(6).Info("Cloning GitOps repository")
 	if out, err := execute(outputPath, GitCommand, "clone", remote, componentName); err != nil {
-		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
+		return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
 	}
 	s.Log.V(6).Info("GitOps repository cloned")
 
@@ -120,19 +120,19 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 	s.Log.V(6).Info(fmt.Sprintf("Checking out branch %s", branch))
 	if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
 		if out, err := execute(repoPath, GitCommand, "checkout", "-b", branch); err != nil {
-			return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
+			return &GitBranchError{branch: branch, repoPath: repoPath, cmdResult: string(out), err: err, cmdType: checkoutBranch}
 		}
 	}
 	s.Log.V(6).Info(fmt.Sprintf("Branch %s checked out", branch))
 
 	if out, err := execute(repoPath, RmCommand, "-rf", filepath.Join("components", componentName, "base")); err != nil {
-		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", filepath.Join("components", componentName, "base"), repoPath, string(out), err)
+		return &DeleteFolderError{componentPath: filepath.Join("components", componentName, "base"), repoPath: repoPath, cmdResult: string(out), err: err}
 	}
 
 	// Generate the gitops resources and update the parent kustomize yaml file
 	s.Log.V(6).Info(fmt.Sprintf("Generating GitOps resources under %s", componentPath))
 	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
-		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
+		return &GitGenResourcesAndOverlaysError{path: componentPath, componentName: componentName, err: err}
 	}
 	s.Log.V(6).Info(fmt.Sprintf("GitOps resources generated under %s", componentPath))
 
@@ -163,18 +163,19 @@ func (s Gen) CommitAndPush(outputPath string, repoPathOverride string, remote st
 	}
 
 	if out, err := execute(repoPath, GitCommand, "add", "."); err != nil {
-		return fmt.Errorf("failed to add files for component %q to repository in %q %q: %s", componentName, repoPath, string(out), err)
+		return &GitAddFilesError{componentName: componentName, repoPath: repoPath, cmdResult: string(out), err: err}
 	}
 
 	if out, err := execute(repoPath, GitCommand, "--no-pager", "diff", "--cached"); err != nil {
-		return fmt.Errorf("failed to check git diff in repository %q %q: %s", repoPath, string(out), err)
+		return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: checkGitDiff}
+
 	} else if string(out) != "" {
 		// Commit the changes and push
 		if out, err := execute(repoPath, GitCommand, "commit", "-m", commitMessage); err != nil {
-			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
+			return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: commitFiles}
 		}
 		if out, err := execute(repoPath, GitCommand, "push", "origin", branch); err != nil {
-			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
+			return &GitCmdError{path: remote, cmdResult: string(out), err: err, cmdType: pushRemote}
 		}
 	}
 
@@ -201,7 +202,7 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 	gitHostAccessToken := options.Secret
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
 	if err := Generate(appFs, gitopsFolder, componentPath, options); err != nil {
-		return fmt.Errorf("failed to generate the gitops resources in %q for component %q: %s", componentPath, componentName, err)
+		return &GitGenResourcesAndOverlaysError{path: componentPath, componentName: componentName, err: err}
 	}
 
 	// Commit the changes and push
@@ -221,16 +222,21 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 		}
 		u, err := url.Parse(gitOpsRepoURL)
 		if err != nil {
-			return fmt.Errorf("failed to parse GitOps repo URL %q: %w", gitOpsRepoURL, err)
+			return &GitOpsRepoGenError{gitopsURL: gitOpsRepoURL, errMsg: "failed to parse GitOps repo URL %q: %w", err: err}
 		}
 		parts := strings.Split(u.Path, "/")
-		org := parts[1]
-		repoName := strings.TrimSuffix(strings.Join(parts[2:], "/"), ".git")
+		var org, repoName string
+		//Check length to avoid panic
+		if len(parts) > 3 {
+			org = parts[1]
+			repoName = strings.TrimSuffix(strings.Join(parts[2:], "/"), ".git")
+		}
+
 		u.User = url.UserPassword("", gitHostAccessToken)
 
 		client, err := factory.FromRepoURL(u.String())
 		if err != nil {
-			return fmt.Errorf("failed to create a client to access %q: %w", gitOpsRepoURL, err)
+			return &GitOpsRepoGenError{gitopsURL: gitOpsRepoURL, errMsg: "failed to create a client to access %q: %w", err: err}
 		}
 		ctx := context.Background()
 		// If we're creating the repository in a personal user's account, it's a
@@ -238,7 +244,7 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 		// the "create repo in personal account" endpoint.
 		currentUser, _, err := client.Users.Find(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get the user with their auth token: %w", err)
+			return &GitOpsRepoGenUserError{err: err}
 		}
 		if currentUser.Login == org {
 			org = ""
@@ -259,26 +265,26 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 			if _, resp, err := client.Repositories.Find(context.Background(), repo); err == nil && resp.Status == 200 {
 				return fmt.Errorf("failed to create repository, repo already exists")
 			}
-			return fmt.Errorf("failed to create repository %q in namespace %q: %w", repoName, org, err)
+			return &GitCreateRepoError{repoName: repoName, org: org, err: err}
 		}
 
 		if out, err := execute(repoPath, GitCommand, "init", "."); err != nil {
-			return fmt.Errorf("failed to initialize git repository in %q %q: %s", repoPath, string(out), err)
+			return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: initializeGit}
 		}
 		if out, err := execute(repoPath, GitCommand, "add", "."); err != nil {
-			return fmt.Errorf("failed to add components to repository in %q %q: %s", repoPath, string(out), err)
+			return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: addComponents}
 		}
 		if out, err := execute(repoPath, GitCommand, "commit", "-m", "Generate GitOps resources"); err != nil {
-			return fmt.Errorf("failed to commit files to repository in %q %q: %s", repoPath, string(out), err)
+			return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: commitFiles}
 		}
 		if out, err := execute(repoPath, GitCommand, "branch", "-m", branch); err != nil {
-			return fmt.Errorf("failed to switch to branch %q in repository in %q %q: %s", branch, repoPath, string(out), err)
+			return &GitBranchError{branch: branch, repoPath: repoPath, cmdResult: string(out), err: err, cmdType: switchBranch}
 		}
 		if out, err := execute(repoPath, GitCommand, "remote", "add", "origin", remote); err != nil {
-			return fmt.Errorf("failed to add files for component %q, to remote 'origin' %q to repository in %q %q: %s", componentName, remote, repoPath, string(out), err)
+			return &GitAddFilesToRemoteError{componentName: componentName, remoteURL: remote, repoPath: repoPath, cmdResult: string(out), err: err}
 		}
 		if out, err := execute(repoPath, GitCommand, "push", "-u", "origin", branch); err != nil {
-			return fmt.Errorf("failed push remote to repository %q %q: %s", remote, string(out), err)
+			return &GitCmdError{path: remote, cmdResult: string(out), err: err, cmdType: pushRemote}
 		}
 	}
 
@@ -313,13 +319,13 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 
 	if clone {
 		if out, err := execute(outputPath, GitCommand, "clone", remote, applicationName); err != nil {
-			return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
+			return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
 		}
 
 		// Checkout the specified branch
 		if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
 			if out, err := execute(repoPath, GitCommand, "checkout", "-b", branch); err != nil {
-				return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
+				return &GitBranchError{branch: branch, repoPath: repoPath, cmdResult: string(out), err: err, cmdType: checkoutBranch}
 			}
 		}
 	}
@@ -328,7 +334,7 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentEnvOverlaysPath := filepath.Join(gitopsFolder, "components", componentName, "overlays", environmentName)
 	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, options, imageName, namespace, componentGeneratedResources); err != nil {
-		return fmt.Errorf("failed to generate the gitops resources in overlays dir %q for component %q: %s", componentEnvOverlaysPath, componentName, err)
+		return &GitGenResourcesAndOverlaysError{path: componentEnvOverlaysPath, componentName: componentName, err: err, cmdType: genOverlays}
 	}
 
 	if doPush {
@@ -368,12 +374,12 @@ func (s Gen) CloneRepo(outputPath string, remote string, componentName string, b
 	repoPath := filepath.Join(outputPath, componentName)
 
 	if out, err := execute(outputPath, GitCommand, "clone", remote, componentName); err != nil {
-		return fmt.Errorf("failed to clone git repository in %q %q: %s", outputPath, string(out), err)
+		return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
 	}
 	// Checkout the specified branch
 	if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
 		if out, err := execute(repoPath, GitCommand, "checkout", "-b", branch); err != nil {
-			return fmt.Errorf("failed to checkout branch %q in %q %q: %s", branch, repoPath, string(out), err)
+			return &GitBranchError{branch: branch, repoPath: repoPath, cmdResult: string(out), err: err, cmdType: checkoutBranch}
 		}
 	}
 	return nil
@@ -388,7 +394,7 @@ func removeComponent(outputPath string, componentName string, context string) er
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName)
 	if out, err := execute(repoPath, RmCommand, "-rf", componentPath); err != nil {
-		return fmt.Errorf("failed to delete %q folder in repository in %q %q: %s", componentPath, repoPath, string(out), err)
+		return &DeleteFolderError{componentPath: componentPath, repoPath: repoPath, cmdResult: string(out), err: err}
 	}
 	return nil
 }
@@ -398,7 +404,7 @@ func (s Gen) GetCommitIDFromRepo(fs afero.Afero, repoPath string) (string, error
 	var out []byte
 	var err error
 	if out, err = execute(repoPath, GitCommand, "rev-parse", "HEAD"); err != nil {
-		return "", fmt.Errorf("failed to retrieve commit id for repository in %q %q: %s", repoPath, string(out), err)
+		return "", &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: getCommitID}
 	}
 	return string(out), nil
 }

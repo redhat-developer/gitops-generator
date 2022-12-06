@@ -25,6 +25,7 @@ import (
 
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
+	"github.com/redhat-developer/gitops-generator/pkg/util"
 	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +35,7 @@ var originalExecute = execute
 
 func TestCloneGenerateAndPush(t *testing.T) {
 	repo := "https://github.com/testing/testing.git"
+	repoWithToken := "https://ghu_28lafsjdifouwej@github.com/testing/testing.git"
 	outputPath := "/fake/path"
 	repoPath := "/fake/path/test-component"
 	componentName := "test-component"
@@ -51,6 +53,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 
 	tests := []struct {
 		name          string
+		repo          string
 		fs            afero.Afero
 		component     gitopsv1alpha1.GeneratorOptions
 		errors        *testutils.ErrorStack
@@ -60,6 +63,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 	}{
 		{
 			name:      "No errors",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors:    &testutils.ErrorStack{},
@@ -112,6 +116,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "Git clone failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -135,6 +140,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "Git switch failure, git checkout failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -166,10 +172,11 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					Args:    []string{"checkout", "-b", "main"},
 				},
 			},
-			wantErrString: "failed to checkout branch \"main\" in \"/fake/path/test-component\" \"test output1\": Permission denied",
+			wantErrString: "failed to checkout branch \"main\" in repository \"/fake/path/test-component\" \"test output1\": Permission denied",
 		},
 		{
 			name:      "Git switch failure, git checkout success",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -235,6 +242,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "rm -rf failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -270,6 +278,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "git add failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -312,6 +321,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "git diff failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -361,6 +371,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name:      "git commit failure",
+			repo:      repo,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -413,10 +424,11 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
 				},
 			},
-			wantErrString: "failed to commit files to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
+			wantErrString: "failed to commit files to repository \"/fake/path/test-component\" \"test output1\": Fatal error",
 		},
 		{
-			name:      "git push failure",
+			name:      "git push failure with sanitized error message",
+			repo:      repoWithToken,
 			fs:        fs,
 			component: component,
 			errors: &testutils.ErrorStack{
@@ -443,7 +455,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				{
 					BaseDir: outputPath,
 					Command: "git",
-					Args:    []string{"clone", repo, component.Name},
+					Args:    []string{"clone", repoWithToken, component.Name},
 				},
 				{
 					BaseDir: repoPath,
@@ -476,10 +488,11 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
+			wantErrString: util.SanitizeErrorMessage(fmt.Errorf("failed to push remote to repository \"%s\" \"test output1\": Fatal error", repoWithToken)).Error(),
 		},
 		{
 			name:      "gitops generate failure",
+			repo:      repo,
 			fs:        readOnlyFs,
 			component: component,
 			errors:    &testutils.ErrorStack{},
@@ -504,6 +517,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 		},
 		{
 			name: "gitops generate failure - image component",
+			repo: repo,
 			fs:   readOnlyFs,
 			component: gitopsv1alpha1.GeneratorOptions{
 				Name:           "test-component",
@@ -540,7 +554,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			err := generator.CloneGenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", "/", true)
+			err := generator.CloneGenerateAndPush(outputPath, tt.repo, tt.component, tt.fs, "main", "/", true)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
@@ -700,7 +714,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					Args:    []string{"checkout", "-b", "main"},
 				},
 			},
-			wantErrString: "failed to checkout branch \"main\" in \"/fake/path/test-application\" \"test output1\": Permission denied",
+			wantErrString: "failed to checkout branch \"main\" in repository \"/fake/path/test-application\" \"test output1\": Permission denied",
 		},
 		{
 			name:      "Git switch failure, git checkout success",
@@ -901,7 +915,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					Args:    []string{"commit", "-m", fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName)},
 				},
 			},
-			wantErrString: "failed to commit files to repository in \"/fake/path/test-application\" \"test output1\": Fatal error",
+			wantErrString: "failed to commit files to repository \"/fake/path/test-application\" \"test output1\": Fatal error",
 		},
 		{
 			name:      "git push failure",
@@ -961,7 +975,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
+			wantErrString: fmt.Sprintf("failed to push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 		{
 			name:            "gitops generate failure",
@@ -1152,7 +1166,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					Args:    []string{"checkout", "-b", "main"},
 				},
 			},
-			wantErrString: "failed to checkout branch \"main\" in \"/fake/path/test-component\" \"test output1\": Permission denied",
+			wantErrString: "failed to checkout branch \"main\" in repository \"/fake/path/test-component\" \"test output1\": Permission denied",
 		},
 		{
 			name:      "Git switch failure, git checkout success",
@@ -1399,7 +1413,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
 				},
 			},
-			wantErrString: "failed to commit files to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
+			wantErrString: "failed to commit files to repository \"/fake/path/test-component\" \"test output1\": Fatal error",
 		},
 		{
 			name:      "git push failure",
@@ -1462,7 +1476,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
+			wantErrString: fmt.Sprintf("failed to push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 	}
 
@@ -1629,7 +1643,7 @@ func TestRemoveComponent(t *testing.T) {
 					Args:    []string{"checkout", "-b", "main"},
 				},
 			},
-			wantCloneErrString: "failed to checkout branch \"main\" in \"/fake/path/test-component\" \"test output1\": Permission denied",
+			wantCloneErrString: "failed to checkout branch \"main\" in repository \"/fake/path/test-component\" \"test output1\": Permission denied",
 		},
 		{
 			name:      "Git switch failure, git checkout success",
@@ -1876,7 +1890,7 @@ func TestRemoveComponent(t *testing.T) {
 					Args:    []string{"commit", "-m", fmt.Sprintf("Removed component %s", componentName)},
 				},
 			},
-			wantPushErrString: "failed to commit files to repository in \"/fake/path/test-component\" \"test output1\": Fatal error",
+			wantPushErrString: "failed to commit files to repository \"/fake/path/test-component\" \"test output1\": Fatal error",
 		},
 		{
 			name:      "git push failure",
@@ -1939,7 +1953,7 @@ func TestRemoveComponent(t *testing.T) {
 					Args:    []string{"push", "origin", "main"},
 				},
 			},
-			wantPushErrString: fmt.Sprintf("failed push remote to repository \"%s\" \"test output1\": Fatal error", repo),
+			wantPushErrString: fmt.Sprintf("failed to push remote to repository \"%s\" \"test output1\": Fatal error", repo),
 		},
 	}
 
@@ -2047,10 +2061,8 @@ func TestGenerateAndPush(t *testing.T) {
 	outputPath := "/fake/path"
 	component := gitopsv1alpha1.GeneratorOptions{
 		ContainerImage: "testimage:latest",
-		GitSource: &gitopsv1alpha1.GitSource{
-			URL: repo,
-		},
-		TargetPort: 5000,
+		GitSource:      &gitopsv1alpha1.GitSource{},
+		TargetPort:     5000,
 	}
 	component.Name = "test-component"
 	fs := ioutils.NewMemoryFilesystem()
@@ -2061,6 +2073,8 @@ func TestGenerateAndPush(t *testing.T) {
 		component     gitopsv1alpha1.GeneratorOptions
 		errors        *testutils.ErrorStack
 		outputs       [][]byte
+		doPush        bool
+		repo          string
 		want          []testutils.Execution
 		wantErrString string
 	}{
@@ -2068,8 +2082,30 @@ func TestGenerateAndPush(t *testing.T) {
 			name:      "No errors. GenerateAndPush test with no push",
 			fs:        fs,
 			component: component,
+			doPush:    false,
+			repo:      "https://github.com/testing/testing.git",
 			errors:    &testutils.ErrorStack{},
 			want:      []testutils.Execution{},
+		},
+		{
+			name:          "GenerateAndPush test with push.  Client access error",
+			fs:            fs,
+			component:     component,
+			doPush:        true,
+			repo:          "https://xyz/testing/testing.git",
+			errors:        &testutils.ErrorStack{},
+			want:          []testutils.Execution{},
+			wantErrString: "failed to create a client to access \"https://xyz/testing/testing.git\": unable to identify driver from hostname: xyz",
+		},
+		{
+			name:          "GenerateAndPush test with push.  Unauthorized user error",
+			fs:            fs,
+			component:     component,
+			doPush:        true,
+			repo:          "https://github.com/testing/testing.git",
+			errors:        &testutils.ErrorStack{},
+			want:          []testutils.Execution{},
+			wantErrString: "failed to get the user with their auth token: Unauthorized",
 		},
 	}
 
@@ -2077,9 +2113,9 @@ func TestGenerateAndPush(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			outputStack := testutils.NewOutputs(tt.outputs...)
 			executedCmds := []testutils.Execution{}
-
+			component.GitSource.URL = tt.repo
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
-			err := generator.GenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", false, "KAM CLI")
+			err := generator.GenerateAndPush(outputPath, repo, tt.component, tt.fs, "main", tt.doPush, "KAM CLI")
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)
