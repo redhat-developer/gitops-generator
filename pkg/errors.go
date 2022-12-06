@@ -52,7 +52,7 @@ func (e *GitCmdError) Error() string {
 	cmdMsg := e.cmdType
 	if e.cmdType == checkGitDiff {
 		cmdMsg = cmdMsg + " in"
-	} else if e.cmdType == commitFiles || e.cmdType == pushRemote {
+	} else if e.cmdType == commitFiles || e.cmdType == pushRemote || e.cmdType == addComponents {
 		cmdMsg = cmdMsg + " to"
 	} else if e.cmdType == getCommitID {
 		cmdMsg = cmdMsg + " for"
