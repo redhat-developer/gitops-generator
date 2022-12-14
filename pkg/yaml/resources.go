@@ -65,10 +65,28 @@ func MarshalItemToFile(fs afero.Fs, filename string, item interface{}) error {
 
 // MarshalOutput marshal output to given writer
 func MarshalOutput(out io.Writer, output interface{}) error {
-	data, err := yaml.Marshal(output)
-	if err != nil {
-		return fmt.Errorf("failed to marshal data: %v", err)
+
+	separator := []byte("---\n")
+	var data []byte
+	var err error
+
+	if v, ok := output.([]interface{}); ok {
+		for _, o := range v {
+			nestedData, err := yaml.Marshal(o)
+			if err != nil {
+				return fmt.Errorf("failed to marshal data: %v", err)
+			}
+			nestedData = append(nestedData, separator...)
+			data = append(data, nestedData...)
+		}
+	} else {
+
+		data, err = yaml.Marshal(output)
+		if err != nil {
+			return fmt.Errorf("failed to marshal data: %v", err)
+		}
 	}
+
 	_, err = fmt.Fprintf(out, "%s", data)
 	if err != nil {
 		return fmt.Errorf("failed to write data: %v", err)

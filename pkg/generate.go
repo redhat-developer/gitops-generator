@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	yaml "github.com/redhat-developer/gitops-generator/pkg/yaml"
+
+	"github.com/go-logr/logr"
 )
 
 const (
@@ -38,14 +40,27 @@ const (
 	deploymentPatchFileName = "deployment-patch.yaml"
 	serviceFileName         = "service.yaml"
 	routeFileName           = "route.yaml"
+	otherFileName           = "other_resources.yaml"
 )
 
 var CreatedBy = "application-service"
 
 // Generate takes in a given Component CR and
 // spits out a deployment, service, and route file to disk
-func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
-	deployment := generateDeployment(component)
+func Generate(log logr.Logger, fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
+
+	var deployment *appsv1.Deployment
+	if len(component.KubernetesResources.Deployments) == 0 {
+		deployment = generateDeployment(component)
+	} else {
+		deployment, component.KubernetesResources.Deployments = &component.KubernetesResources.Deployments[0], component.KubernetesResources.Deployments[1:]
+		var otherDeployments []interface{}
+		for _, deployment := range component.KubernetesResources.Deployments {
+			otherDeployments = append(otherDeployments, deployment)
+		}
+
+		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherDeployments...)
+	}
 
 	k := resources.Kustomization{
 		APIVersion: "kustomize.config.k8s.io/v1beta1",
@@ -56,13 +71,43 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 		deploymentFileName: deployment,
 	}
 
+	var service *corev1.Service
+	var route *routev1.Route
 	// If a targetPort was specified, also generate a service and route
-	if component.TargetPort != 0 {
-		service := generateService(component)
-		route := generateRoute(component)
+	if len(component.KubernetesResources.Services) == 0 && len(component.KubernetesResources.Routes) == 0 && component.TargetPort != 0 {
+		service = generateService(component)
+		route = generateRoute(component)
+	} else {
+		service, component.KubernetesResources.Services = &component.KubernetesResources.Services[0], component.KubernetesResources.Services[1:]
+		route, component.KubernetesResources.Routes = &component.KubernetesResources.Routes[0], component.KubernetesResources.Routes[1:]
+
+		var otherServices, otherRoutes []interface{}
+		for _, service := range component.KubernetesResources.Services {
+			otherServices = append(otherServices, service)
+		}
+		for _, route := range component.KubernetesResources.Routes {
+			otherRoutes = append(otherRoutes, route)
+		}
+
+		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherServices...)
+		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherRoutes...)
+	}
+
+	var otherIngresses []interface{}
+	for _, ingress := range component.KubernetesResources.Ingresses {
+		otherIngresses = append(otherIngresses, ingress)
+	}
+
+	component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherIngresses...)
+
+	if service != nil && route != nil {
 		k.AddResources(deploymentFileName, serviceFileName, routeFileName)
 		resources[serviceFileName] = service
 		resources[routeFileName] = route
+	}
+
+	if len(component.KubernetesResources.Others) > 0 {
+		resources[otherFileName] = component.KubernetesResources.Others
 	}
 
 	resources[kustomizeFileName] = k

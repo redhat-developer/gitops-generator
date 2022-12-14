@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
 	"github.com/redhat-developer/gitops-generator/pkg/util"
@@ -1488,7 +1489,7 @@ func TestGitRemoveComponent(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			if err := Generate(fs, repoPath, componentBasePath, tt.component); err != nil {
+			if err := Generate(logr.Logger{}, fs, repoPath, componentBasePath, tt.component); err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
 			}
@@ -1964,7 +1965,7 @@ func TestRemoveComponent(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			if err := Generate(fs, repoPath, componentBasePath, tt.component); err != nil {
+			if err := Generate(logr.Logger{}, fs, repoPath, componentBasePath, tt.component); err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
 			}
