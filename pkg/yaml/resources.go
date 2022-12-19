@@ -80,7 +80,6 @@ func MarshalOutput(out io.Writer, output interface{}) error {
 			data = append(data, nestedData...)
 		}
 	} else {
-
 		data, err = yaml.Marshal(output)
 		if err != nil {
 			return fmt.Errorf("failed to marshal data: %v", err)

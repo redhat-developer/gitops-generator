@@ -29,6 +29,7 @@ type GitSource struct {
 	URL string `json:"url"`
 }
 
+// KubernetesResources define the list of Kubernetes resources
 type KubernetesResources struct {
 	Deployments []appsv1.Deployment
 	Services    []corev1.Service

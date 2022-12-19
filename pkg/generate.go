@@ -30,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	yaml "github.com/redhat-developer/gitops-generator/pkg/yaml"
-
-	"github.com/go-logr/logr"
 )
 
 const (
@@ -47,7 +45,7 @@ var CreatedBy = "application-service"
 
 // Generate takes in a given Component CR and
 // spits out a deployment, service, and route file to disk
-func Generate(log logr.Logger, fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
+func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
 
 	var deployment *appsv1.Deployment
 	if len(component.KubernetesResources.Deployments) == 0 {
