@@ -200,6 +200,13 @@ func TestMarshalItemToFileAndUnMarshalItemFromFile(t *testing.T) {
 func TestMarshallOutput(t *testing.T) {
 	fs := ioutils.NewMemoryFilesystem()
 	readOnlyFs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+	str := []string{"first", "second"}
+	other := make([]interface{}, len(str))
+	for i, s := range str {
+		other[i] = s
+	}
+	otherInvalid := make([]interface{}, 1)
+	otherInvalid[0] = make(chan int)
 
 	f, _ := fs.Create("/test/file")
 	readonlyF, _ := readOnlyFs.Open("/")
@@ -216,9 +223,21 @@ func TestMarshallOutput(t *testing.T) {
 			errMsg: "",
 		},
 		{
+			name:   "Array resource",
+			f:      f,
+			item:   other,
+			errMsg: "",
+		},
+		{
 			name:   "Invalid resource",
 			f:      f,
 			item:   make(chan int),
+			errMsg: "failed to marshal data: error marshaling into JSON: json: unsupported type: chan int",
+		},
+		{
+			name:   "Array invalid resource",
+			f:      f,
+			item:   otherInvalid,
 			errMsg: "failed to marshal data: error marshaling into JSON: json: unsupported type: chan int",
 		},
 		{

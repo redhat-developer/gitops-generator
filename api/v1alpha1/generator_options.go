@@ -17,13 +17,25 @@ limitations under the License.
 package v1alpha1
 
 import (
+	routev1 "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 )
 
 // GitSource describes the Component source
 type GitSource struct {
 	// If importing from git, the repository to create the component from
 	URL string `json:"url"`
+}
+
+// KubernetesResources define the list of Kubernetes resources
+type KubernetesResources struct {
+	Deployments []appsv1.Deployment
+	Services    []corev1.Service
+	Routes      []routev1.Route
+	Ingresses   []networkingv1.Ingress
+	Others      []interface{}
 }
 
 // GeneratorOptions - This captures the options for generating the component's GitOps resources for a component of an
@@ -72,4 +84,7 @@ type GeneratorOptions struct {
 
 	// The container image to build or create the component from
 	ContainerImage string `json:"containerImage,omitempty"`
+
+	// KubernetesResources to be used instead of generating the Kubernetes resources from a component
+	KubernetesResources KubernetesResources `json:"kuberntesResources,omitempty"`
 }

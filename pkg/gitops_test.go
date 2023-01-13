@@ -29,6 +29,12 @@ import (
 	"github.com/redhat-developer/gitops-generator/pkg/util/ioutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+
+	routev1 "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var originalExecute = execute
@@ -67,6 +73,111 @@ func TestCloneGenerateAndPush(t *testing.T) {
 			fs:        fs,
 			component: component,
 			errors:    &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name: "No errors with Kubernetes Resources provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "deployment1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "deployment2",
+							},
+						},
+					},
+					Services: []corev1.Service{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "service1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "service2",
+							},
+						},
+					},
+					Routes: []routev1.Route{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "route1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "route2",
+							},
+						},
+					},
+					Ingresses: []networkingv1.Ingress{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "ingress1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "ingress2",
+							},
+						},
+					},
+				},
+			},
+			errors: &testutils.ErrorStack{},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
