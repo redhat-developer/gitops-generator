@@ -17,6 +17,7 @@ package util
 
 import (
 	"errors"
+	"math/rand"
 	"net/url"
 	"regexp"
 	"strings"
@@ -39,7 +40,10 @@ func ValidateRemote(remote string) error {
 }
 
 /* #nosec G101 -- regex for remote url segment that can contain a token.  This is not a hardcoded token*/
-const tokenRegex = `(https:\/\/)(\w+)@`
+const (
+	tokenRegex  = `(https:\/\/)(\w+)@`
+	schemaBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+)
 
 // SanitizeErrorMessage takes in a given error message and returns a new, sanitized error with things like tokens removed
 func SanitizeErrorMessage(err error) error {
@@ -56,4 +60,19 @@ func SanitizeErrorMessage(err error) error {
 	}
 
 	return errors.New(newErrMsg)
+}
+
+// GetRandomString returns a random string which is n characters long.
+// If lower is set to true a lower case string is returned.
+func GetRandomString(n int, lower bool) string {
+	b := make([]byte, n)
+	for i := range b {
+		/* #nosec G404 -- not used for cryptographic purposes*/
+		b[i] = schemaBytes[rand.Intn(len(schemaBytes)-1)]
+	}
+	randomString := string(b)
+	if lower {
+		randomString = strings.ToLower(randomString)
+	}
+	return randomString
 }
