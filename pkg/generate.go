@@ -50,7 +50,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	var deployment *appsv1.Deployment
 	if len(component.KubernetesResources.Deployments) == 0 {
 		deployment = generateDeployment(component)
-	} else {
+	} else if len(component.KubernetesResources.Deployments) > 0 {
 		deployment, component.KubernetesResources.Deployments = &component.KubernetesResources.Deployments[0], component.KubernetesResources.Deployments[1:]
 		var otherDeployments []interface{}
 		for _, deployment := range component.KubernetesResources.Deployments {
