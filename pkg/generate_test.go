@@ -16,11 +16,14 @@
 package gitops
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
+	"github.com/stretchr/testify/assert"
 
 	routev1 "github.com/openshift/api/route/v1"
 	gitopsv1alpha1 "github.com/redhat-developer/gitops-generator/api/v1alpha1"
@@ -29,7 +32,9 @@ import (
 	"github.com/spf13/afero"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -739,5 +744,361 @@ func TestGenerateOverlays(t *testing.T) {
 
 			}
 		})
+	}
+}
+
+func TestGenerate(t *testing.T) {
+
+	applicationName := "test-application"
+	componentName := "test-component"
+	namespace := "test-namespace"
+
+	deployment1 := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "deployment1",
+		},
+	}
+	deployment2 := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "deployment2",
+		},
+	}
+
+	service1 := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "service1",
+		},
+	}
+	service2 := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "service2",
+		},
+	}
+
+	route1 := routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "route1",
+		},
+	}
+	route2 := routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "route2",
+		},
+	}
+
+	ingress1 := networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ingress1",
+		},
+	}
+	ingress2 := networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ingress2",
+		},
+	}
+
+	pod1 := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+		},
+	}
+
+	others1 := []interface{}{
+		deployment2,
+		service2,
+		route2,
+	}
+
+	others2 := []interface{}{
+		pod1,
+		deployment2,
+		ingress1,
+		ingress2,
+	}
+
+	fs := ioutils.NewFilesystem()
+
+	tests := []struct {
+		name                  string
+		fs                    afero.Afero
+		component             gitopsv1alpha1.GeneratorOptions
+		isDeploymentGenerated bool
+		isServicetGenerated   bool
+		isRouteGenerated      bool
+		isSerializeRequired   bool // set to true if you are going to test KubernetesResources.Others
+		wantFiles             map[string]interface{}
+		wantErr               bool
+	}{
+		{
+			name: "Single deployment object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						deployment1,
+					},
+				},
+			},
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName},
+				},
+				deploymentFileName: deployment1,
+			},
+		},
+		{
+			name: "Single svc object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Services: []corev1.Service{
+						service1,
+					},
+				},
+			},
+			isDeploymentGenerated: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName, serviceFileName},
+				},
+				serviceFileName: service1,
+			},
+		},
+		{
+			name: "Single route object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Routes: []routev1.Route{
+						route1,
+					},
+				},
+			},
+			isDeploymentGenerated: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName, routeFileName},
+				},
+				"route.yaml": route1,
+			},
+		},
+		{
+			name: "Single deployment object provided only, with Target Port should generate svc and route too",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						deployment1,
+					},
+				},
+				TargetPort: 1234,
+			},
+			isServicetGenerated: true,
+			isRouteGenerated:    true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName, routeFileName, serviceFileName},
+				},
+				deploymentFileName: deployment1,
+			},
+		},
+		{
+			name: "Multiple deployment, service and route provided",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						deployment1,
+						deployment2,
+					},
+					Services: []corev1.Service{
+						service1,
+						service2,
+					},
+					Routes: []routev1.Route{
+						route1,
+						route2,
+					},
+				},
+				TargetPort: 1234,
+			},
+			isSerializeRequired: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName, otherFileName, routeFileName, serviceFileName},
+				},
+				deploymentFileName: deployment1,
+				serviceFileName:    service1,
+				routeFileName:      route1,
+				otherFileName:      others1,
+			},
+		},
+		{
+			name: "Multiple deployments, ingresses and other multiple resources object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						deployment1,
+						deployment2,
+					},
+					Ingresses: []networkingv1.Ingress{
+						ingress1,
+						ingress2,
+					},
+					Others: []interface{}{
+						pod1,
+					},
+				},
+			},
+			isSerializeRequired: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName, otherFileName},
+				},
+				deploymentFileName: deployment1,
+				otherFileName:      others2,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			path, cleanup := makeTempDir(t)
+			defer cleanup()
+			outputFolder := filepath.ToSlash(filepath.Join(path, "manifest", "gitops"))
+
+			// if resources are generated, add the generated resources to the wantFiles list
+			if tt.isDeploymentGenerated {
+				tt.wantFiles[deploymentFileName] = generateDeployment(tt.component)
+			}
+
+			if tt.isServicetGenerated {
+				tt.wantFiles[serviceFileName] = generateService(tt.component)
+			}
+
+			if tt.isRouteGenerated {
+				tt.wantFiles[routeFileName] = generateRoute(tt.component)
+			}
+
+			// serialize array interface to match file contents
+			if tt.isSerializeRequired {
+				separator := []byte("---\n")
+				var data []byte
+				notSerialized := tt.wantFiles[otherFileName]
+				if v, ok := notSerialized.([]interface{}); ok {
+					for _, o := range v {
+						nestedData, err := yaml.Marshal(o)
+						assertNoError(t, err)
+						nestedData = append(nestedData, separator...)
+						data = append(data, nestedData...)
+					}
+				}
+				tt.wantFiles[otherFileName] = data
+			}
+
+			err := Generate(tt.fs, "", outputFolder, tt.component)
+			if tt.wantErr && (err == nil) {
+				t.Error("wanted error but got nil")
+			} else if !tt.wantErr && err != nil {
+				t.Errorf("got unexpected error: %v", err)
+			} else if err == nil {
+				assertResourcesExists(t, outputFolder, tt.wantFiles)
+			}
+		})
+	}
+}
+
+func makeTempDir(t *testing.T) (string, func()) {
+	t.Helper()
+	dir, err := ioutil.TempDir(os.TempDir(), "manifest")
+	assertNoError(t, err)
+	return dir, func() {
+		err := os.RemoveAll(dir)
+		assertNoError(t, err)
+	}
+}
+
+func assertResourcesExists(t *testing.T, outputFolder string, wantFiles map[string]interface{}) {
+
+	t.Helper()
+
+	fileInfos, err := ioutil.ReadDir(outputFolder)
+	assertNoError(t, err)
+
+	var generatedFiles []string
+	for _, fi := range fileInfos {
+		if !fi.IsDir() {
+			generatedFiles = append(generatedFiles, fi.Name())
+		}
+	}
+
+	for _, generatedFile := range generatedFiles {
+		isExpectedFile := false
+		for wantFileName, wantResource := range wantFiles {
+			if generatedFile == wantFileName {
+				isExpectedFile = true
+				var want []byte
+				if wantFileName != otherFileName {
+					want, err = yaml.Marshal(wantResource)
+					assertNoError(t, err)
+				} else {
+					if r, ok := wantResource.([]byte); ok {
+						want = r
+					} else {
+						t.Fatalf("error reading wanted file %s", otherFileName)
+					}
+				}
+
+				got, err := ioutil.ReadFile(filepath.Join(outputFolder, wantFileName))
+				assertNoError(t, err)
+				assert.Equal(t, want, got, "file %s should be equal", wantFileName)
+			}
+		}
+
+		if isExpectedFile {
+			delete(wantFiles, generatedFile)
+		} else {
+			t.Fatalf("file generated %s not expected", generatedFile)
+		}
+	}
+}
+
+// AssertNoError fails if there's an error
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

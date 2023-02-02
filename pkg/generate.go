@@ -122,6 +122,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	}
 
 	if len(component.KubernetesResources.Others) > 0 {
+		k.AddResources(otherFileName)
 		resources[otherFileName] = component.KubernetesResources.Others
 	}
 
