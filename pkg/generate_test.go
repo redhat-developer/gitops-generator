@@ -822,6 +822,7 @@ func TestGenerate(t *testing.T) {
 		name                  string
 		fs                    afero.Afero
 		component             gitopsv1alpha1.GeneratorOptions
+		outputFolder          string
 		isDeploymentGenerated bool
 		isServicetGenerated   bool
 		isRouteGenerated      bool
@@ -990,14 +991,43 @@ func TestGenerate(t *testing.T) {
 				otherFileName:      others2,
 			},
 		},
+		{
+			name:         "Error case with an invalid output path",
+			fs:           ioutils.NewReadOnlyFs(),
+			outputFolder: "~~~",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						deployment1,
+					},
+				},
+			},
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{deploymentFileName},
+				},
+				deploymentFileName: deployment1,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			path, cleanup := makeTempDir(t)
-			defer cleanup()
-			outputFolder := filepath.ToSlash(filepath.Join(path, "manifest", "gitops"))
+			var outputFolder string
+			if tt.outputFolder == "" {
+				path, cleanup := makeTempDir(t)
+				defer cleanup()
+				outputFolder = filepath.ToSlash(filepath.Join(path, "manifest", "gitops"))
+			} else {
+				outputFolder = tt.outputFolder
+			}
 
 			// if resources are generated, add the generated resources to the wantFiles list
 			if tt.isDeploymentGenerated {
