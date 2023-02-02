@@ -1,5 +1,5 @@
 //
-// Copyright 2021-2022 Red Hat, Inc.
+// Copyright 2021-2023 Red Hat, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	var deployment *appsv1.Deployment
 	if len(component.KubernetesResources.Deployments) == 0 {
 		deployment = generateDeployment(component)
-	} else {
+	} else if len(component.KubernetesResources.Deployments) > 0 {
 		deployment, component.KubernetesResources.Deployments = &component.KubernetesResources.Deployments[0], component.KubernetesResources.Deployments[1:]
 		var otherDeployments []interface{}
 		for _, deployment := range component.KubernetesResources.Deployments {
@@ -71,23 +71,36 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 
 	var service *corev1.Service
 	var route *routev1.Route
-	// If a targetPort was specified, also generate a service and route
-	if len(component.KubernetesResources.Services) == 0 && len(component.KubernetesResources.Routes) == 0 && component.TargetPort != 0 {
-		service = generateService(component)
-		route = generateRoute(component)
-	} else {
-		service, component.KubernetesResources.Services = &component.KubernetesResources.Services[0], component.KubernetesResources.Services[1:]
-		route, component.KubernetesResources.Routes = &component.KubernetesResources.Routes[0], component.KubernetesResources.Routes[1:]
 
-		var otherServices, otherRoutes []interface{}
+	if len(component.KubernetesResources.Services) == 0 && component.TargetPort != 0 {
+		// If service was not provided, generate a service only if target port was provided
+		// If service was not provided and target port is 0, skip generation
+		service = generateService(component)
+	} else if len(component.KubernetesResources.Services) > 0 {
+		// If a service was provided, get the first and append the rest to others
+		service, component.KubernetesResources.Services = &component.KubernetesResources.Services[0], component.KubernetesResources.Services[1:]
+
+		var otherServices []interface{}
 		for _, service := range component.KubernetesResources.Services {
 			otherServices = append(otherServices, service)
 		}
+
+		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherServices...)
+	}
+
+	if len(component.KubernetesResources.Routes) == 0 && component.TargetPort != 0 {
+		// If route was not provided, generate a route only if target port was provided
+		// If route was not provided and target port is 0, skip generation
+		route = generateRoute(component)
+	} else if len(component.KubernetesResources.Routes) > 0 {
+		// If a route was provided, get the first and append the rest to others
+		route, component.KubernetesResources.Routes = &component.KubernetesResources.Routes[0], component.KubernetesResources.Routes[1:]
+
+		var otherRoutes []interface{}
 		for _, route := range component.KubernetesResources.Routes {
 			otherRoutes = append(otherRoutes, route)
 		}
 
-		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherServices...)
 		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherRoutes...)
 	}
 
@@ -98,13 +111,18 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 
 	component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherIngresses...)
 
-	if service != nil && route != nil {
-		k.AddResources(deploymentFileName, serviceFileName, routeFileName)
+	if service != nil {
+		k.AddResources(serviceFileName)
 		resources[serviceFileName] = service
+	}
+
+	if route != nil {
+		k.AddResources(routeFileName)
 		resources[routeFileName] = route
 	}
 
 	if len(component.KubernetesResources.Others) > 0 {
+		k.AddResources(otherFileName)
 		resources[otherFileName] = component.KubernetesResources.Others
 	}
 

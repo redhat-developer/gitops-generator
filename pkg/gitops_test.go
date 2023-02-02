@@ -226,6 +226,328 @@ func TestCloneGenerateAndPush(t *testing.T) {
 			},
 		},
 		{
+			name: "No errors with Kubernetes Resource deployment provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Deployments: []appsv1.Deployment{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "deployment1",
+							},
+						},
+					},
+				},
+			},
+			errors: &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name: "No errors with Kubernetes Resource svc and target port provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Services: []corev1.Service{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "service1",
+							},
+						},
+					},
+				},
+				TargetPort: 1234,
+			},
+			errors: &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name: "No errors with Kubernetes Resource svc and target port not provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Services: []corev1.Service{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "service1",
+							},
+						},
+					},
+				},
+			},
+			errors: &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name: "No errors with Kubernetes Resource route and target port provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Routes: []routev1.Route{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "route1",
+							},
+						},
+					},
+				},
+				TargetPort: 1234,
+			},
+			errors: &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
+			name: "No errors with Kubernetes Resource route and target port not provided",
+			repo: repo,
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Routes: []routev1.Route{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "route1",
+							},
+						},
+					},
+				},
+			},
+			errors: &testutils.ErrorStack{},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+				[]byte("test output3"),
+				[]byte("test output4"),
+				[]byte("test output5"),
+				[]byte("test output6"),
+				[]byte("test output7"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"switch", "main"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "rm",
+					Args:    []string{"-rf", filepath.Join("components", componentName, "base")},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"add", "."},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"--no-pager", "diff", "--cached"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"commit", "-m", fmt.Sprintf("Generate GitOps base resources for component %s", componentName)},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"push", "origin", "main"},
+				},
+			},
+		},
+		{
 			name:      "Git clone failure",
 			repo:      repo,
 			fs:        fs,
