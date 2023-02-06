@@ -75,6 +75,17 @@ func (e *GitBranchError) Error() string {
 	return util.SanitizeErrorMessage(fmt.Errorf("failed to %s branch %q in repository %q %q: %s", e.cmdType, e.branch, e.repoPath, string(e.cmdResult), e.err)).Error()
 }
 
+// GitFetchError is used to construct custom errors related to git fetch failures
+type GitFetchError struct {
+	remote    string
+	cmdResult string
+	err       error
+}
+
+func (e *GitFetchError) Error() string {
+	return util.SanitizeErrorMessage(fmt.Errorf("failed to fetch from remote %q %q: %s", e.remote, string(e.cmdResult), e.err)).Error()
+}
+
 type GitGenResourcesAndOverlaysError struct {
 	path          string
 	componentName string

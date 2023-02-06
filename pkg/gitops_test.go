@@ -81,12 +81,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -186,12 +192,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -250,12 +262,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -315,12 +333,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -379,12 +403,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -444,12 +474,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -508,12 +544,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -572,6 +614,35 @@ func TestCloneGenerateAndPush(t *testing.T) {
 			wantErrString: "test error",
 		},
 		{
+			name:      "Git fetch failure",
+			repo:      repo,
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("fetch error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
+				},
+			},
+			wantErrString: "fetch error",
+		},
+		{
 			name:      "Git switch failure, git checkout failure",
 			repo:      repo,
 			fs:        fs,
@@ -581,18 +652,25 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					errors.New("Permission denied"),
 					errors.New("Fatal error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -617,6 +695,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					nil,
 					errors.New("test error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -628,12 +707,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output6"),
 				[]byte("test output7"),
 				[]byte("test output8"),
+				[]byte("test output9"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -683,18 +768,25 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					errors.New("Permission Denied"),
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -720,6 +812,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -727,12 +820,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output2"),
 				[]byte("test output3"),
 				[]byte("test output4"),
+				[]byte("test output5"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -764,6 +863,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -772,12 +872,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output3"),
 				[]byte("test output4"),
 				[]byte("test output5"),
+				[]byte("test output6"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -815,6 +921,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -824,12 +931,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output4"),
 				[]byte("test output5"),
 				[]byte("test output6"),
+				[]byte("test output7"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -873,6 +986,7 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -883,12 +997,18 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repoWithToken, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -938,6 +1058,11 @@ func TestCloneGenerateAndPush(t *testing.T) {
 				{
 					BaseDir: repoPath,
 					Command: "git",
+					Args:    []string{"fetch"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
 					Args:    []string{"switch", "main"},
 				},
 				{
@@ -963,6 +1088,11 @@ func TestCloneGenerateAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, "test-component"},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1045,6 +1175,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 				[]byte("test output4"),
 				[]byte("test output5"),
 				[]byte("test output6"),
+				[]byte("test output7"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1055,6 +1186,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1111,6 +1247,35 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 			wantErrString: "test error",
 		},
 		{
+			name:      "Git fetch failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("fetch error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
+				},
+			},
+			applicationName: applicationName,
+			wantErrString:   "fetch error",
+		},
+		{
 			name:      "Git switch failure, git checkout failure",
 			fs:        fs,
 			component: component,
@@ -1119,12 +1284,14 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					errors.New("Permission denied"),
 					errors.New("Fatal error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1135,6 +1302,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1158,6 +1330,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					nil,
 					errors.New("test error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1168,6 +1341,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1178,6 +1352,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1221,12 +1400,14 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					errors.New("Fatal error"),
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1237,6 +1418,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1261,6 +1447,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1268,6 +1455,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 				[]byte("test output2"),
 				[]byte("test output3"),
 				[]byte("test output4"),
+				[]byte("test output5"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1278,6 +1466,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1308,6 +1501,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1316,6 +1510,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 				[]byte("test output3"),
 				[]byte("test output4"),
 				[]byte("test output5"),
+				[]byte("test output6"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1326,6 +1521,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1362,6 +1562,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1371,6 +1572,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 				[]byte("test output4"),
 				[]byte("test output5"),
 				[]byte("test output6"),
+				[]byte("test output7"),
 			},
 			applicationName: applicationName,
 			environmentName: environmentName,
@@ -1381,6 +1583,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1424,6 +1631,11 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, applicationName},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1504,12 +1716,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1567,6 +1785,34 @@ func TestGitRemoveComponent(t *testing.T) {
 			wantErrString: "test error",
 		},
 		{
+			name:      "Git fetch failure",
+			fs:        fs,
+			component: component,
+			errors: &testutils.ErrorStack{
+				Errors: []error{
+					errors.New("fetch error"),
+					nil,
+				},
+			},
+			outputs: [][]byte{
+				[]byte("test output1"),
+				[]byte("test output2"),
+			},
+			want: []testutils.Execution{
+				{
+					BaseDir: outputPath,
+					Command: "git",
+					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
+				},
+			},
+			wantErrString: "fetch error",
+		},
+		{
 			name:      "Git switch failure, git checkout failure",
 			fs:        fs,
 			component: component,
@@ -1575,18 +1821,25 @@ func TestGitRemoveComponent(t *testing.T) {
 					errors.New("Permission denied"),
 					errors.New("Fatal error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1610,6 +1863,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					nil,
 					errors.New("test error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1621,12 +1875,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output6"),
 				[]byte("test output7"),
 				[]byte("test output8"),
+				[]byte("test output9"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1675,18 +1935,25 @@ func TestGitRemoveComponent(t *testing.T) {
 					errors.New("Permission Denied"),
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1711,6 +1978,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1718,12 +1986,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output2"),
 				[]byte("test output3"),
 				[]byte("test output4"),
+				[]byte("test output5"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1754,6 +2028,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1762,12 +2037,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output3"),
 				[]byte("test output4"),
 				[]byte("test output5"),
+				[]byte("test output6"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1804,6 +2085,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1813,12 +2095,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output4"),
 				[]byte("test output5"),
 				[]byte("test output6"),
+				[]byte("test output7"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1861,6 +2149,7 @@ func TestGitRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -1871,12 +2160,18 @@ func TestGitRemoveComponent(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -1981,12 +2276,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2052,18 +2353,25 @@ func TestRemoveComponent(t *testing.T) {
 					errors.New("Permission denied"),
 					errors.New("Fatal error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2087,6 +2395,7 @@ func TestRemoveComponent(t *testing.T) {
 					nil,
 					errors.New("test error"),
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -2098,12 +2407,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output6"),
 				[]byte("test output7"),
 				[]byte("test output8"),
+				[]byte("test output9"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2152,18 +2467,25 @@ func TestRemoveComponent(t *testing.T) {
 					errors.New("Permission Denied"),
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
 				[]byte("test output1"),
 				[]byte("test output2"),
 				[]byte("test output3"),
+				[]byte("test output4"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2188,6 +2510,7 @@ func TestRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -2195,12 +2518,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output2"),
 				[]byte("test output3"),
 				[]byte("test output4"),
+				[]byte("test output5"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2231,6 +2560,7 @@ func TestRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -2239,12 +2569,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output3"),
 				[]byte("test output4"),
 				[]byte("test output5"),
+				[]byte("test output6"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2281,6 +2617,7 @@ func TestRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -2290,12 +2627,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output4"),
 				[]byte("test output5"),
 				[]byte("test output6"),
+				[]byte("test output7"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
@@ -2338,6 +2681,7 @@ func TestRemoveComponent(t *testing.T) {
 					nil,
 					nil,
 					nil,
+					nil,
 				},
 			},
 			outputs: [][]byte{
@@ -2348,12 +2692,18 @@ func TestRemoveComponent(t *testing.T) {
 				[]byte("test output5"),
 				[]byte("test output6"),
 				[]byte("test output7"),
+				[]byte("test output8"),
 			},
 			want: []testutils.Execution{
 				{
 					BaseDir: outputPath,
 					Command: "git",
 					Args:    []string{"clone", repo, component.Name},
+				},
+				{
+					BaseDir: repoPath,
+					Command: "git",
+					Args:    []string{"fetch"},
 				},
 				{
 					BaseDir: repoPath,
