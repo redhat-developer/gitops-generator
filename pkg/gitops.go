@@ -116,11 +116,6 @@ func (s Gen) CloneGenerateAndPush(outputPath string, remote string, options gito
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentPath := filepath.Join(gitopsFolder, "components", componentName, "base")
 
-	// Fetch from remote
-	if out, err := execute(repoPath, GitCommand, "fetch"); err != nil {
-		return &GitFetchError{err: err, cmdResult: string(out), remote: remote}
-	}
-
 	// Checkout the specified branch
 	s.Log.V(6).Info(fmt.Sprintf("Checking out branch %s", branch))
 	if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
@@ -175,6 +170,16 @@ func (s Gen) CommitAndPush(outputPath string, repoPathOverride string, remote st
 		return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: checkGitDiff}
 
 	} else if string(out) != "" {
+		// Pull from remote if branch is present
+		if out, err := execute(repoPath, GitCommand, "ls-remote", "--heads", remote, branch); err != nil {
+			return &GitLsRemoteError{err: err, cmdResult: string(out), remote: remote}
+		} else if strings.Contains(string(out), "refs/heads/"+branch) {
+			// only if the git repository contains the branch, pull
+			if out, err := execute(repoPath, GitCommand, "pull"); err != nil {
+				return &GitPullError{err: err, cmdResult: string(out), remote: remote}
+			}
+		}
+
 		// Commit the changes and push
 		if out, err := execute(repoPath, GitCommand, "commit", "-m", commitMessage); err != nil {
 			return &GitCmdError{path: repoPath, cmdResult: string(out), err: err, cmdType: commitFiles}
@@ -327,11 +332,6 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 			return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
 		}
 
-		// Fetch from remote
-		if out, err := execute(repoPath, GitCommand, "fetch"); err != nil {
-			return &GitFetchError{err: err, cmdResult: string(out), remote: remote}
-		}
-
 		// Checkout the specified branch
 		if _, err := execute(repoPath, GitCommand, "switch", branch); err != nil {
 			if out, err := execute(repoPath, GitCommand, "checkout", "-b", branch); err != nil {
@@ -385,11 +385,6 @@ func (s Gen) CloneRepo(outputPath string, remote string, componentName string, b
 
 	if out, err := execute(outputPath, GitCommand, "clone", remote, componentName); err != nil {
 		return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
-	}
-
-	// Fetch from remote
-	if out, err := execute(repoPath, GitCommand, "fetch"); err != nil {
-		return &GitFetchError{err: err, cmdResult: string(out), remote: remote}
 	}
 
 	// Checkout the specified branch
