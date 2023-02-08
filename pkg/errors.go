@@ -75,6 +75,28 @@ func (e *GitBranchError) Error() string {
 	return util.SanitizeErrorMessage(fmt.Errorf("failed to %s branch %q in repository %q %q: %s", e.cmdType, e.branch, e.repoPath, string(e.cmdResult), e.err)).Error()
 }
 
+// GitPullError is used to construct custom errors related to git pull failures
+type GitPullError struct {
+	remote    string
+	cmdResult string
+	err       error
+}
+
+func (e *GitPullError) Error() string {
+	return util.SanitizeErrorMessage(fmt.Errorf("failed to pull from remote %q %q: %s", e.remote, string(e.cmdResult), e.err)).Error()
+}
+
+// GitLsRemoteError is used to construct custom errors related to git ls-remote failures
+type GitLsRemoteError struct {
+	remote    string
+	cmdResult string
+	err       error
+}
+
+func (e *GitLsRemoteError) Error() string {
+	return util.SanitizeErrorMessage(fmt.Errorf("failed to list git remotes for remote %q %q: %s", e.remote, string(e.cmdResult), e.err)).Error()
+}
+
 type GitGenResourcesAndOverlaysError struct {
 	path          string
 	componentName string
