@@ -161,7 +161,25 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		Kind:       "Kustomization",
 	}
 
-	deploymentPatch := generateDeploymentPatch(options, imageName, namespace)
+	var originalDeploymentContent appsv1.Deployment
+	baseDeploymentFilePath := filepath.Join(outputFolder, "../../base/", deploymentFileName)
+	DeploymentFileExist, err := fs.Exists(baseDeploymentFilePath)
+	containerName := "container-image"
+	if err != nil {
+		return err
+	}
+	if DeploymentFileExist {
+		err = yaml.UnMarshalItemFromFile(fs, baseDeploymentFilePath, &originalDeploymentContent)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal items from %q: %v", filepath.Join(outputFolder, kustomizeFileName), err)
+		}
+
+		if len(originalDeploymentContent.Spec.Template.Spec.Containers) > 0 {
+			containerName = originalDeploymentContent.Spec.Template.Spec.Containers[0].Name
+		}
+	}
+
+	deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
 
 	k.AddResources("../../base")
 	k.AddPatches(deploymentPatchFileName)
@@ -291,7 +309,7 @@ func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deplo
 	return &deployment
 }
 
-func generateDeploymentPatch(options gitopsv1alpha1.GeneratorOptions, imageName, namespace string) *appsv1.Deployment {
+func generateDeploymentPatch(options gitopsv1alpha1.GeneratorOptions, imageName, containerName, namespace string) *appsv1.Deployment {
 
 	deployment := appsv1.Deployment{
 		TypeMeta: v1.TypeMeta{
@@ -308,7 +326,7 @@ func generateDeploymentPatch(options gitopsv1alpha1.GeneratorOptions, imageName,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "container-image",
+							Name:  containerName,
 							Image: imageName,
 						},
 					},
