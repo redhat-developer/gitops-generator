@@ -309,12 +309,14 @@ func TestGenerateDeployment(t *testing.T) {
 func TestGenerateDeploymentPatch(t *testing.T) {
 	componentName := "test-component"
 	namespace := "test-namespace"
+	containerName := "test-container"
 	replicas := int32(1)
 	image := "image"
 
 	tests := []struct {
 		name           string
 		component      gitopsv1alpha1.GeneratorOptions
+		containerName  string
 		imageName      string
 		namespace      string
 		wantDeployment appsv1.Deployment
@@ -346,8 +348,9 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 					},
 				},
 			},
-			namespace: namespace,
-			imageName: image,
+			namespace:     namespace,
+			imageName:     image,
+			containerName: containerName,
 			wantDeployment: appsv1.Deployment{
 				TypeMeta: v1.TypeMeta{
 					Kind:       "Deployment",
@@ -364,7 +367,7 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "container-image",
+									Name:  containerName,
 									Image: image,
 									Env: []corev1.EnvVar{
 										{
@@ -392,7 +395,7 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			generatedDeployment := generateDeploymentPatch(tt.component, tt.imageName, tt.namespace)
+			generatedDeployment := generateDeploymentPatch(tt.component, tt.imageName, tt.containerName, tt.namespace)
 
 			if !reflect.DeepEqual(*generatedDeployment, tt.wantDeployment) {
 				t.Errorf("TestGenerateDeploymentPatch() error: expected %v got %v", tt.wantDeployment, *generatedDeployment)
@@ -610,11 +613,55 @@ func TestGenerateRoute(t *testing.T) {
 }
 
 func TestGenerateOverlays(t *testing.T) {
+	component := gitopsv1alpha1.GeneratorOptions{
+		Name: "test-component",
+	}
+	imageName := "test-image"
+	namespace := "test-namespace"
+	containerName := "test-container"
+
 	fs := ioutils.NewMemoryFilesystem()
 	readOnlyFs := ioutils.NewReadOnlyFs()
 
 	// Prepopulate the fs with components
 	gitOpsFolder := "/tmp/gitops"
+	fs.MkdirAll(gitOpsFolder, 0755)
+	baseFolder := filepath.Join(gitOpsFolder, "../", "base")
+	fs.MkdirAll(baseFolder, 0755)
+	baseDeploymentFilePath := filepath.Join(baseFolder, "deployment.yaml")
+	baseDeployment := appsv1.Deployment{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test-component",
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &v1.LabelSelector{},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  containerName,
+							Image: imageName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bytes, err := yaml.Marshal(baseDeployment)
+	if err != nil {
+		t.Errorf("unexpected error when marshal the base deployment yaml %v", err)
+	}
+	err = fs.WriteFile(baseDeploymentFilePath, bytes, 0755)
+	if err != nil {
+		t.Errorf("unexpected error when writing to base deployment file: %v", err)
+	}
+
 	outputFolder := filepath.Join(gitOpsFolder, "overlays")
 	fs.MkdirAll(outputFolder, 0755)
 
@@ -624,7 +671,7 @@ func TestGenerateOverlays(t *testing.T) {
 	k := resources.Kustomization{
 		Patches: []string{"patch1.yaml", "custom-patch1.yaml"},
 	}
-	bytes, err := yaml.Marshal(k)
+	bytes, err = yaml.Marshal(k)
 	if err != nil {
 		t.Errorf("unexpected error when marshal the kustomization yaml %v", err)
 	}
@@ -647,12 +694,6 @@ func TestGenerateOverlays(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error when writing to kustomizatipn file: %v", err)
 	}
-
-	component := gitopsv1alpha1.GeneratorOptions{
-		Name: "test-component",
-	}
-	imageName := "test-image"
-	namespace := "test-namespace"
 
 	tests := []struct {
 		name                        string
@@ -711,9 +752,29 @@ func TestGenerateOverlays(t *testing.T) {
 			}
 
 			if tt.wantErr == "" {
+				// Validate that the deployment.yaml preserve the container name
+				deploymentPatchFilepath := filepath.Join(tt.outputFolder, "deployment-patch.yaml")
+				exists, err := tt.fs.Exists(deploymentPatchFilepath)
+				if err != nil {
+					t.Errorf("unexpected error checking if deployment file exists %v", err)
+				}
+				if !exists {
+					t.Errorf("deployment file does not exist at path %v", deploymentPatchFilepath)
+				}
+
+				deployPatch := appsv1.Deployment{}
+				deploymentPatchBytes, err := tt.fs.ReadFile(deploymentPatchFilepath)
+				if err != nil {
+					t.Errorf("unexpected error reading deployment file")
+				}
+				yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
+				if deployPatch.Spec.Template.Spec.Containers[0].Name != containerName {
+					t.Errorf("expected container name %v, got %v", containerName, deployPatch.Spec.Template.Spec.Containers[0].Name)
+				}
+
 				// Validate that the kustomization.yaml got created successfully and contains the proper entries
 				kustomizationFilepath := filepath.Join(tt.outputFolder, "kustomization.yaml")
-				exists, err := tt.fs.Exists(kustomizationFilepath)
+				exists, err = tt.fs.Exists(kustomizationFilepath)
 				if err != nil {
 					t.Errorf("unexpected error checking if kustomize file exists %v", err)
 				}
