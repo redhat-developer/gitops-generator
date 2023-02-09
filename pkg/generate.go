@@ -175,12 +175,7 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		}
 
 		if len(originalDeploymentContent.Spec.Template.Spec.Containers) > 0 {
-			for _, container := range originalDeploymentContent.Spec.Template.Spec.Containers {
-				if container.Image == imageName {
-					containerName = container.Name
-					break
-				}
-			}
+			containerName = originalDeploymentContent.Spec.Template.Spec.Containers[0].Name
 		}
 	}
 
