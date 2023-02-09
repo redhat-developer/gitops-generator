@@ -171,11 +171,16 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 	if DeploymentFileExist {
 		err = yaml.UnMarshalItemFromFile(fs, baseDeploymentFilePath, &originalDeploymentContent)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal items from %q: %v", filepath.Join(outputFolder, kustomizeFileName), err)
+			return fmt.Errorf("failed to unmarshal items from %q: %v", baseDeploymentFilePath, err)
 		}
 
 		if len(originalDeploymentContent.Spec.Template.Spec.Containers) > 0 {
-			containerName = originalDeploymentContent.Spec.Template.Spec.Containers[0].Name
+			for _, container := range originalDeploymentContent.Spec.Template.Spec.Containers {
+				if container.Image == imageName {
+					containerName = container.Name
+					break
+				}
+			}
 		}
 	}
 
