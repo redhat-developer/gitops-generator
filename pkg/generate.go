@@ -23,6 +23,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/redhat-developer/gitops-generator/pkg/resources"
+	"github.com/redhat-developer/gitops-generator/pkg/util"
 	"github.com/spf13/afero"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -398,6 +399,12 @@ func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
 }
 
 func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {
+	// Trim the generated route name to under 30 characters (plus a few random characters for uniqueness)
+	// To ensure issues where the generated hostname (componentName-namespace) is too long
+	routeName := options.Name
+	if len(routeName) >= 30 {
+		routeName = routeName[0:25] + util.GetRandomString(4, true)
+	}
 	k8sLabels := generateK8sLabels(options)
 	weight := int32(100)
 	route := routev1.Route{
@@ -406,7 +413,7 @@ func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {
 			APIVersion: "route.openshift.io/v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      options.Name,
+			Name:      routeName,
 			Namespace: options.Namespace,
 			Labels:    k8sLabels,
 		},

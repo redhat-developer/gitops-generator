@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/redhat-developer/gitops-generator/pkg/testutils"
@@ -599,12 +600,71 @@ func TestGenerateRoute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Generated route with trimmed CR name",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        "some-longer-component-name-test-string",
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				K8sLabels: map[string]string{
+					"app.kubernetes.io/name":       "some-longer-component-name-test-string",
+					"app.kubernetes.io/instance":   "ComponentCRName",
+					"app.kubernetes.io/part-of":    applicationName,
+					"app.kubernetes.io/managed-by": "kustomize",
+					"app.kubernetes.io/created-by": "GitOps Generator Test",
+				},
+				Route: "example.com",
+			},
+			wantRoute: routev1.Route{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "Route",
+					APIVersion: "route.openshift.io/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: namespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/name":       "some-longer-component-name-test-string",
+						"app.kubernetes.io/instance":   "ComponentCRName",
+						"app.kubernetes.io/part-of":    applicationName,
+						"app.kubernetes.io/managed-by": "kustomize",
+						"app.kubernetes.io/created-by": "GitOps Generator Test",
+					},
+				},
+				Spec: routev1.RouteSpec{
+					Host: "example.com",
+					Port: &routev1.RoutePort{
+						TargetPort: intstr.FromInt(5000),
+					},
+					TLS: &routev1.TLSConfig{
+						InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+						Termination:                   routev1.TLSTerminationEdge,
+					},
+					To: routev1.RouteTargetReference{
+						Kind:   "Service",
+						Name:   "some-longer-component-name-test-string",
+						Weight: &weight,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			generatedRoute := generateRoute(tt.component)
+			if len(generatedRoute.Name) > 30 {
+				t.Errorf("TestGenerateRoute() error: expected CR name of length 30, got %v", len(generatedRoute.Name))
+			}
 
+			if tt.name == "Generated route with trimmed CR name" {
+				trimmedComponentName := "some-longer-component-nam"
+				if !strings.Contains(generatedRoute.Name, trimmedComponentName) {
+					t.Errorf("TestGenerateRoute() error: expected component CR name to contain %v got %v", tt.wantRoute, generatedRoute)
+				}
+
+				tt.wantRoute.Name = generatedRoute.Name
+			}
 			if !reflect.DeepEqual(*generatedRoute, tt.wantRoute) {
 				t.Errorf("TestGenerateRoute() error: expected %v got %v", tt.wantRoute, generatedRoute)
 			}
