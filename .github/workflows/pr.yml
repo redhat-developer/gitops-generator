@@ -18,7 +18,7 @@ jobs:
       - name: Run tests
         run: make test
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b #v2.1.0
 
       - name: Run Gosec Security Scanner
         run: |
@@ -31,10 +31,10 @@ jobs:
           fi   
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@17573ee1cc1b9d061760f3a006fc4aac4f944fd5 #v2
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b #v2.1.0
