@@ -18,4 +18,4 @@ jobs:
       - name: Run tests
         run: make test
       - name: Codecov
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b #v2.1.0
