@@ -6,6 +6,8 @@ A community open-source library to help with your project's GitOps needs.
 
 This library generates the Kubernetes resource files and uses the Kustomize tool. The files are then pushed to the Git repository specified.
 
+For more information on the specifics of the resources generated, please refer to the [generation](./docs/generation.md) documentation
+
 ## Developement & Testing
 
 ### Prerequisite
