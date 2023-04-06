@@ -85,6 +85,10 @@ type GeneratorOptions struct {
 	// The container image to build or create the component from
 	ContainerImage string `json:"containerImage,omitempty"`
 
+	// RevisionHistoryLimit specifies the number of allowed revisions for generated deployments
+	// If unset, RevisionHistorylimit in the deployment spec(s) will not be set
+	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
 	// KubernetesResources to be used instead of generating the Kubernetes resources from a component
 	KubernetesResources KubernetesResources `json:"kuberntesResources,omitempty"`
 }
