@@ -251,8 +251,7 @@ func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deplo
 			Labels:    k8sLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas:             &replicas,
-			RevisionHistoryLimit: revHistoryLimit,
+			Replicas: &replicas,
 			Selector: &v1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
@@ -311,6 +310,10 @@ func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deplo
 				},
 			},
 		}
+	}
+
+	if revHistoryLimit != nil {
+		deployment.Spec.RevisionHistoryLimit = revHistoryLimit
 	}
 
 	return &deployment
