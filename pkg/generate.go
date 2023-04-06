@@ -228,6 +228,11 @@ func UpdateExistingKustomize(fs afero.Afero, outputFolder string) error {
 }
 
 func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deployment {
+	var revHistoryLimit *int32
+	if component.RevisionHistoryLimit != nil {
+		revHistoryLimit = component.RevisionHistoryLimit
+	}
+
 	var containerImage string
 	if component.ContainerImage != "" {
 		containerImage = component.ContainerImage
@@ -246,7 +251,8 @@ func generateDeployment(component gitopsv1alpha1.GeneratorOptions) *appsv1.Deplo
 			Labels:    k8sLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
+			Replicas:             &replicas,
+			RevisionHistoryLimit: revHistoryLimit,
 			Selector: &v1.LabelSelector{
 				MatchLabels: matchLabels,
 			},

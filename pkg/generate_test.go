@@ -66,6 +66,8 @@ func TestGenerateDeployment(t *testing.T) {
 		"app.kubernetes.io/instance": componentName,
 	}
 
+	revisionHistoryLimit := int32(0)
+
 	tests := []struct {
 		name           string
 		component      gitopsv1alpha1.GeneratorOptions
@@ -135,6 +137,7 @@ func TestGenerateDeployment(t *testing.T) {
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					},
 				},
+				RevisionHistoryLimit: &revisionHistoryLimit,
 			},
 			wantDeployment: appsv1.Deployment{
 				TypeMeta: v1.TypeMeta{
@@ -147,7 +150,8 @@ func TestGenerateDeployment(t *testing.T) {
 					Labels:    customK8slabels,
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: &otherReplicas,
+					Replicas:             &otherReplicas,
+					RevisionHistoryLimit: &revisionHistoryLimit,
 					Selector: &v1.LabelSelector{
 						MatchLabels: matchLabels,
 					},
