@@ -809,7 +809,7 @@ func TestGenerateOverlays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, component, imageName, namespace, tt.componentGeneratedResources)
+			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, component, imageName, namespace, ClusterInfo{}, tt.componentGeneratedResources)
 
 			if !testutils.ErrorMatch(t, tt.wantErr, err) {
 				t.Errorf("unexpected error return value. Got %v", err)
