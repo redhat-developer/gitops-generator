@@ -310,12 +310,11 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 // 6. environmentName: The name of the environment
 // 7. imageName: The image name of the source
 // 8  namespace: The namespace of the component. This is used in as the namespace of the deployment yaml.
-// 9. clusterInfo: Cluster environment information - OpenShift or Kubernetes cluster, Ingress Domain
-// 10. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
-// 11. The branch to push to
-// 12. The path within the repository to generate the resources in
-// 13. Push the changes to the repository or not.
-// 14. The gitops config containing the build bundle;
+// 9. The filesystem object used to create (either ioutils.NewFilesystem() or ioutils.NewMemoryFilesystem())
+// 10. The branch to push to
+// 11. The path within the repository to generate the resources in
+// 12. Push the changes to the repository or not.
+// 13. The gitops config containing the build bundle;
 func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 
 	if clone || doPush {
