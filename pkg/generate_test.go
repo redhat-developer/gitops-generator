@@ -794,65 +794,6 @@ func TestGenerateIngress(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "Generated ingress with trimmed CR name",
-			options: gitopsv1alpha1.GeneratorOptions{
-				Name:        "some-longer-component-name-test-string",
-				Namespace:   namespace,
-				Application: applicationName,
-				TargetPort:  5000,
-				K8sLabels: map[string]string{
-					"app.kubernetes.io/name":       "some-longer-component-name-test-string",
-					"app.kubernetes.io/instance":   "ComponentCRName",
-					"app.kubernetes.io/part-of":    applicationName,
-					"app.kubernetes.io/managed-by": "kustomize",
-					"app.kubernetes.io/created-by": "GitOps Generator Test",
-				},
-				Route: componentName + ".example.com",
-			},
-			wantIngress: networkingv1.Ingress{
-				TypeMeta: v1.TypeMeta{
-					Kind:       "Ingress",
-					APIVersion: "networking.k8s.io/v1",
-				},
-				ObjectMeta: v1.ObjectMeta{
-					Name:      componentName,
-					Namespace: namespace,
-					Labels: map[string]string{
-						"app.kubernetes.io/name":       "some-longer-component-name-test-string",
-						"app.kubernetes.io/instance":   "ComponentCRName",
-						"app.kubernetes.io/part-of":    applicationName,
-						"app.kubernetes.io/managed-by": "kustomize",
-						"app.kubernetes.io/created-by": "GitOps Generator Test",
-					},
-				},
-				Spec: networkingv1.IngressSpec{
-					Rules: []networkingv1.IngressRule{
-						{
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path:     "/",
-											PathType: &implementationSpecific,
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "some-longer-component-name-test-string",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 5000,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-							Host: componentName + ".example.com",
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1124,11 +1065,11 @@ func TestGenerateOverlays(t *testing.T) {
 			}
 
 			if tt.wantErr == "" {
-				// Validate that the deployment.yaml preserve the container name
-				deploymentPatchFilepath := filepath.Join(tt.outputFolder, "deployment-patch.yaml")
+				// Validate that the deployment-patch.yaml preserve the container name
+				deploymentPatchFilepath := filepath.Join(tt.outputFolder, deploymentPatchFileName)
 				exists, err := tt.fs.Exists(deploymentPatchFilepath)
 				if err != nil {
-					t.Errorf("unexpected error checking if deployment file exists %v", err)
+					t.Errorf("unexpected error checking if deployment patch file exists %v", err)
 				}
 				if !exists {
 					t.Errorf("deployment file does not exist at path %v", deploymentPatchFilepath)
@@ -1141,20 +1082,10 @@ func TestGenerateOverlays(t *testing.T) {
 				}
 				err = yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
 				if err != nil {
-					t.Errorf("unexpected error unmarshaling file")
+					t.Errorf("unexpected error unmarshaling deployment patch file bytes")
 				}
 				if deployPatch.Spec.Template.Spec.Containers[0].Name != containerName {
 					t.Errorf("expected container name %v, got %v", containerName, deployPatch.Spec.Template.Spec.Containers[0].Name)
-				}
-
-				// Validate that the kustomization.yaml got created successfully and contains the proper entries
-				kustomizationFilepath := filepath.Join(tt.outputFolder, "kustomization.yaml")
-				exists, err = tt.fs.Exists(kustomizationFilepath)
-				if err != nil {
-					t.Errorf("unexpected error checking if kustomize file exists %v", err)
-				}
-				if !exists {
-					t.Errorf("kustomize file does not exist at path %v", kustomizationFilepath)
 				}
 
 				if tt.options.IsKubernetesCluster {
@@ -1170,11 +1101,11 @@ func TestGenerateOverlays(t *testing.T) {
 						ingress := networkingv1.Ingress{}
 						ingressBytes, err := tt.fs.ReadFile(ingressFilepath)
 						if err != nil {
-							t.Errorf("unexpected error reading deployment file")
+							t.Errorf("unexpected error reading ingress file")
 						}
 						err = yaml.Unmarshal(ingressBytes, &ingress)
 						if err != nil {
-							t.Errorf("unexpected error unmarshaling file")
+							t.Errorf("unexpected error unmarshaling ingress file bytes")
 						}
 						if len(tt.options.KubernetesResources.Ingresses) > 0 && ingress.Name != tt.options.KubernetesResources.Ingresses[0].Name {
 							t.Errorf("expected ingress name %v, got %v", tt.options.KubernetesResources.Ingresses[0].Name, ingress.Name)
@@ -1183,14 +1114,12 @@ func TestGenerateOverlays(t *testing.T) {
 						}
 					}
 
-				}
-
-				if !tt.options.IsKubernetesCluster {
+				} else {
 					// Validate that the route.yaml got created successfully and contains the proper entries
 					routeFilepath := filepath.Join(tt.outputFolder, routeFileName)
 					exists, err = tt.fs.Exists(routeFilepath)
 					if err != nil {
-						t.Errorf("unexpected error checking if ingress file exists %v", err)
+						t.Errorf("unexpected error checking if route file exists %v", err)
 					}
 					if !exists && tt.options.TargetPort != 0 {
 						t.Errorf("route file does not exist at path %v", routeFilepath)
@@ -1198,11 +1127,11 @@ func TestGenerateOverlays(t *testing.T) {
 						route := routev1.Route{}
 						routeBytes, err := tt.fs.ReadFile(routeFilepath)
 						if err != nil {
-							t.Errorf("unexpected error reading deployment file")
+							t.Errorf("unexpected error reading route file")
 						}
 						err = yaml.Unmarshal(routeBytes, &route)
 						if err != nil {
-							t.Errorf("unexpected error unmarshaling file")
+							t.Errorf("unexpected error unmarshaling route file bytes")
 						}
 						if len(tt.options.KubernetesResources.Routes) > 0 && route.Name != tt.options.KubernetesResources.Routes[0].Name {
 							t.Errorf("expected route name %v, got %v", tt.options.KubernetesResources.Routes[0].Name, route.Name)
@@ -1210,6 +1139,16 @@ func TestGenerateOverlays(t *testing.T) {
 							t.Errorf("expected route name %v, got %v", tt.options.Name, route.Name)
 						}
 					}
+				}
+
+				// Validate that the kustomization.yaml got created successfully and contains the proper entries
+				kustomizationFilepath := filepath.Join(tt.outputFolder, kustomizeFileName)
+				exists, err = tt.fs.Exists(kustomizationFilepath)
+				if err != nil {
+					t.Errorf("unexpected error checking if kustomize file exists %v", err)
+				}
+				if !exists {
+					t.Errorf("kustomize file does not exist at path %v", kustomizationFilepath)
 				}
 
 				// Read the kustomization.yaml and validate its entries

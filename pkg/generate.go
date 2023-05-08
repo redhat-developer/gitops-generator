@@ -441,9 +441,6 @@ func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
 func generateIngress(options gitopsv1alpha1.GeneratorOptions) *networkingv1.Ingress {
 
 	ingressName := options.Name
-	if len(ingressName) >= 30 {
-		ingressName = ingressName[0:25] + util.GetRandomString(4, true)
-	}
 	k8sLabels := generateK8sLabels(options)
 
 	implementationSpecific := networkingv1.PathTypeImplementationSpecific
@@ -484,10 +481,8 @@ func generateIngress(options gitopsv1alpha1.GeneratorOptions) *networkingv1.Ingr
 		},
 	}
 
-	if options.Route != "" {
-		if len(ingress.Spec.Rules) > 0 {
-			ingress.Spec.Rules[0].Host = options.Route
-		}
+	if options.Route != "" && len(ingress.Spec.Rules) > 0 {
+		ingress.Spec.Rules[0].Host = options.Route
 	}
 
 	return &ingress
