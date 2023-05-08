@@ -91,4 +91,8 @@ type GeneratorOptions struct {
 
 	// KubernetesResources to be used instead of generating the Kubernetes resources from a component
 	KubernetesResources KubernetesResources `json:"kuberntesResources,omitempty"`
+
+	// IsKubernetesCluster tells us whether it is a Kubernetes or an OpenShift cluster
+	// Default is false, hence it is an OpenShift cluster
+	IsKubernetesCluster bool `json:"isKubernetesCluster,omitempty"`
 }

@@ -136,7 +136,7 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, options 
 }
 
 // GenerateOverlays generates the overlays director in an existing GitOps structure
-func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, options gitopsv1alpha1.GeneratorOptions, imageName, namespace string, clusterInfo ClusterInfo, componentGeneratedResources map[string][]string) error {
+func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, options gitopsv1alpha1.GeneratorOptions, imageName, namespace string, componentGeneratedResources map[string][]string) error {
 	kustomizeFileExist, err := fs.Exists(filepath.Join(outputFolder, kustomizeFileName))
 	if err != nil {
 		return err
@@ -195,10 +195,10 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 	var ingress *networkingv1.Ingress
 
 	// Create an ingress if its a Kubernetes cluster, route if its an OpenShift cluster
-	if clusterInfo.IsKubernetesCluster {
+	if options.IsKubernetesCluster {
 		if len(options.KubernetesResources.Ingresses) == 0 && options.TargetPort != 0 {
 			// If no Ingresses were provided and TargetPort is not 0, generate the Ingress
-			ingress = generateIngress(options, clusterInfo.IngressDomain)
+			ingress = generateIngress(options)
 		} else if len(options.KubernetesResources.Ingresses) > 0 {
 			// If Ingresses were provided, get the first Ingress
 			ingress = &options.KubernetesResources.Ingresses[0]
@@ -438,7 +438,7 @@ func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
 	return &service
 }
 
-func generateIngress(options gitopsv1alpha1.GeneratorOptions, ingressDomain string) *networkingv1.Ingress {
+func generateIngress(options gitopsv1alpha1.GeneratorOptions) *networkingv1.Ingress {
 
 	ingressName := options.Name
 	if len(ingressName) >= 30 {
@@ -490,7 +490,7 @@ func generateIngress(options gitopsv1alpha1.GeneratorOptions, ingressDomain stri
 		}
 	}
 
-	return nil
+	return &ingress
 }
 
 func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {

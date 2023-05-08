@@ -1848,7 +1848,7 @@ func TestGenerateOverlaysAndPush(t *testing.T) {
 
 			execute = newTestExecute(outputStack, tt.errors, &executedCmds)
 
-			err := generator.GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, ClusterInfo{}, tt.fs, branch, "/", true, generatedResources)
+			err := generator.GenerateOverlaysAndPush(outputPath, true, repo, tt.component, tt.applicationName, tt.environmentName, tt.imageName, tt.namespace, tt.fs, branch, "/", true, generatedResources)
 
 			if tt.wantErrString != "" {
 				testutils.AssertErrorMatch(t, tt.wantErrString, err)

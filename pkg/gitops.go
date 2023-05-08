@@ -49,7 +49,7 @@ type Generator interface {
 	CloneGenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, appFs afero.Afero, branch string, context string, doPush bool) error
 	CommitAndPush(outputPath string, repoPathOverride string, remote string, componentName string, branch string, commitMessage string) error
 	GenerateAndPush(outputPath string, remote string, options gitopsv1alpha1.GeneratorOptions, appFs afero.Afero, branch string, doPush bool, createdBy string) error
-	GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, clusterInfo ClusterInfo, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error
+	GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error
 	GitRemoveComponent(outputPath string, remote string, componentName string, branch string, context string) error
 	CloneRepo(outputPath string, remote string, componentName string, branch string) error
 	GetCommitIDFromRepo(fs afero.Afero, repoPath string) (string, error)
@@ -301,11 +301,6 @@ func (s Gen) GenerateAndPush(outputPath string, remote string, options gitopsv1a
 	return nil
 }
 
-type ClusterInfo struct {
-	IsKubernetesCluster bool
-	IngressDomain       string
-}
-
 // GenerateOverlaysAndPush generates the overlays kustomize from App Env Snapshot Binding Spec
 // 1. outputPath: Where to output the gitops resources to
 // 2. clone: Optionally clone the repository first
@@ -321,7 +316,7 @@ type ClusterInfo struct {
 // 12. The path within the repository to generate the resources in
 // 13. Push the changes to the repository or not.
 // 14. The gitops config containing the build bundle;
-func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, clusterInfo ClusterInfo, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
+func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote string, options gitopsv1alpha1.GeneratorOptions, applicationName, environmentName, imageName, namespace string, appFs afero.Afero, branch string, context string, doPush bool, componentGeneratedResources map[string][]string) error {
 
 	if clone || doPush {
 		invalidRemoteErr := util.ValidateRemote(remote)
@@ -350,7 +345,7 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentEnvOverlaysPath := filepath.Join(gitopsFolder, "components", componentName, "overlays", environmentName)
 
-	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, options, imageName, namespace, clusterInfo, componentGeneratedResources); err != nil {
+	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, options, imageName, namespace, componentGeneratedResources); err != nil {
 		return &GitGenResourcesAndOverlaysError{path: componentEnvOverlaysPath, componentName: componentName, err: err, cmdType: genOverlays}
 	}
 
