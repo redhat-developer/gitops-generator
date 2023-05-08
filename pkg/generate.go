@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/afero"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -37,8 +38,9 @@ const (
 	kustomizeFileName       = "kustomization.yaml"
 	deploymentFileName      = "deployment.yaml"
 	deploymentPatchFileName = "deployment-patch.yaml"
-	serviceFileName         = "service.yaml"
+	ingressFileName         = "ingress.yaml"
 	routeFileName           = "route.yaml"
+	serviceFileName         = "service.yaml"
 	otherFileName           = "other_resources.yaml"
 )
 
@@ -46,19 +48,19 @@ var CreatedBy = "application-service"
 
 // Generate takes in a given Component CR and
 // spits out a deployment, service, and route file to disk
-func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, component gitopsv1alpha1.GeneratorOptions) error {
+func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, options gitopsv1alpha1.GeneratorOptions) error {
 
 	var deployment *appsv1.Deployment
-	if len(component.KubernetesResources.Deployments) == 0 {
-		deployment = generateDeployment(component)
-	} else if len(component.KubernetesResources.Deployments) > 0 {
-		deployment, component.KubernetesResources.Deployments = &component.KubernetesResources.Deployments[0], component.KubernetesResources.Deployments[1:]
+	if len(options.KubernetesResources.Deployments) == 0 {
+		deployment = generateDeployment(options)
+	} else if len(options.KubernetesResources.Deployments) > 0 {
+		deployment, options.KubernetesResources.Deployments = &options.KubernetesResources.Deployments[0], options.KubernetesResources.Deployments[1:]
 		var otherDeployments []interface{}
-		for _, deployment := range component.KubernetesResources.Deployments {
+		for _, deployment := range options.KubernetesResources.Deployments {
 			otherDeployments = append(otherDeployments, deployment)
 		}
 
-		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherDeployments...)
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherDeployments...)
 	}
 
 	k := resources.Kustomization{
@@ -71,60 +73,55 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, componen
 	}
 
 	var service *corev1.Service
-	var route *routev1.Route
 
-	if len(component.KubernetesResources.Services) == 0 && component.TargetPort != 0 {
+	if len(options.KubernetesResources.Services) == 0 && options.TargetPort != 0 {
 		// If service was not provided, generate a service only if target port was provided
 		// If service was not provided and target port is 0, skip generation
-		service = generateService(component)
-	} else if len(component.KubernetesResources.Services) > 0 {
+		service = generateService(options)
+	} else if len(options.KubernetesResources.Services) > 0 {
 		// If a service was provided, get the first and append the rest to others
-		service, component.KubernetesResources.Services = &component.KubernetesResources.Services[0], component.KubernetesResources.Services[1:]
+		service, options.KubernetesResources.Services = &options.KubernetesResources.Services[0], options.KubernetesResources.Services[1:]
 
 		var otherServices []interface{}
-		for _, service := range component.KubernetesResources.Services {
+		for _, service := range options.KubernetesResources.Services {
 			otherServices = append(otherServices, service)
 		}
 
-		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherServices...)
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherServices...)
 	}
 
-	if len(component.KubernetesResources.Routes) == 0 && component.TargetPort != 0 {
-		// If route was not provided, generate a route only if target port was provided
-		// If route was not provided and target port is 0, skip generation
-		route = generateRoute(component)
-	} else if len(component.KubernetesResources.Routes) > 0 {
-		// If a route was provided, get the first and append the rest to others
-		route, component.KubernetesResources.Routes = &component.KubernetesResources.Routes[0], component.KubernetesResources.Routes[1:]
+	if len(options.KubernetesResources.Routes) > 0 {
+		// If Routes were provided, append Routes from second onwards to others
+		// The first Route is created in the overlays resource
 
 		var otherRoutes []interface{}
-		for _, route := range component.KubernetesResources.Routes {
+		for _, route := range options.KubernetesResources.Routes[1:] {
 			otherRoutes = append(otherRoutes, route)
 		}
 
-		component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherRoutes...)
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherRoutes...)
 	}
 
-	var otherIngresses []interface{}
-	for _, ingress := range component.KubernetesResources.Ingresses {
-		otherIngresses = append(otherIngresses, ingress)
-	}
+	if len(options.KubernetesResources.Ingresses) > 0 {
+		// If Ingresses were provided, append Ingresses from second onwards to others
+		// The first Ingress is created in the overlays resource
 
-	component.KubernetesResources.Others = append(component.KubernetesResources.Others, otherIngresses...)
+		var otherIngresses []interface{}
+		for _, ingress := range options.KubernetesResources.Ingresses[1:] {
+			otherIngresses = append(otherIngresses, ingress)
+		}
+
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherIngresses...)
+	}
 
 	if service != nil {
 		k.AddResources(serviceFileName)
 		resources[serviceFileName] = service
 	}
 
-	if route != nil {
-		k.AddResources(routeFileName)
-		resources[routeFileName] = route
-	}
-
-	if len(component.KubernetesResources.Others) > 0 {
+	if len(options.KubernetesResources.Others) > 0 {
 		k.AddResources(otherFileName)
-		resources[otherFileName] = component.KubernetesResources.Others
+		resources[otherFileName] = options.KubernetesResources.Others
 	}
 
 	resources[kustomizeFileName] = k
@@ -162,6 +159,10 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		Kind:       "Kustomization",
 	}
 
+	if componentGeneratedResources == nil {
+		componentGeneratedResources = make(map[string][]string)
+	}
+
 	var originalDeploymentContent appsv1.Deployment
 	baseDeploymentFilePath := filepath.Join(outputFolder, "../../base/", deploymentFileName)
 	DeploymentFileExist, err := fs.Exists(baseDeploymentFilePath)
@@ -182,20 +183,50 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 
 	deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
 
+	resources := map[string]interface{}{
+		deploymentPatchFileName: deploymentPatch,
+	}
+
 	k.AddResources("../../base")
 	k.AddPatches(deploymentPatchFileName)
-	if componentGeneratedResources == nil {
-		componentGeneratedResources = make(map[string][]string)
-	}
 	componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
+
+	var route *routev1.Route
+	var ingress *networkingv1.Ingress
+
+	// Create an ingress if its a Kubernetes cluster, route if its an OpenShift cluster
+	if options.IsKubernetesCluster {
+		if len(options.KubernetesResources.Ingresses) == 0 && options.TargetPort != 0 {
+			// If no Ingresses were provided and TargetPort is not 0, generate the Ingress
+			ingress = generateIngress(options)
+		} else if len(options.KubernetesResources.Ingresses) > 0 {
+			// If Ingresses were provided, get the first Ingress
+			ingress = &options.KubernetesResources.Ingresses[0]
+		}
+	} else {
+		if len(options.KubernetesResources.Routes) == 0 && options.TargetPort != 0 {
+			// If no Routes were provided and TargetPort is not 0, generate the Route
+			route = generateRoute(options)
+		} else if len(options.KubernetesResources.Routes) > 0 {
+			// If Routes were provided, get the first Route
+			route = &options.KubernetesResources.Routes[0]
+		}
+	}
+
+	if ingress != nil {
+		k.AddResources(ingressFileName)
+		resources[ingressFileName] = ingress
+	}
+
+	if route != nil {
+		k.AddResources(routeFileName)
+		resources[routeFileName] = route
+	}
 
 	// add back custom kustomization patches
 	k.CompareDifferenceAndAddCustomPatches(originalKustomizeFileContent.Patches, componentGeneratedResources[options.Name])
 
-	resources := map[string]interface{}{
-		deploymentPatchFileName: deploymentPatch,
-		kustomizeFileName:       k,
-	}
+	resources[kustomizeFileName] = k
 
 	_, err = yaml.WriteResources(fs, outputFolder, resources)
 	return err
@@ -405,6 +436,56 @@ func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
 	}
 
 	return &service
+}
+
+func generateIngress(options gitopsv1alpha1.GeneratorOptions) *networkingv1.Ingress {
+
+	ingressName := options.Name
+	k8sLabels := generateK8sLabels(options)
+
+	implementationSpecific := networkingv1.PathTypeImplementationSpecific
+
+	ingress := networkingv1.Ingress{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Ingress",
+			APIVersion: "networking.k8s.io/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      ingressName,
+			Namespace: options.Namespace,
+			Labels:    k8sLabels,
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &implementationSpecific,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: options.Name,
+											Port: networkingv1.ServiceBackendPort{
+												Number: int32(options.TargetPort),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if options.Route != "" && len(ingress.Spec.Rules) > 0 {
+		ingress.Spec.Rules[0].Host = options.Route
+	}
+
+	return &ingress
 }
 
 func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {

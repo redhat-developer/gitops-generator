@@ -676,16 +676,178 @@ func TestGenerateRoute(t *testing.T) {
 	}
 }
 
-func TestGenerateOverlays(t *testing.T) {
-	component := gitopsv1alpha1.GeneratorOptions{
-		Name: "test-component",
+func TestGenerateIngress(t *testing.T) {
+	applicationName := "test-application"
+	componentName := "test-component"
+	namespace := "test-namespace"
+	customK8sLabels := map[string]string{
+		"app.kubernetes.io/name":       componentName,
+		"app.kubernetes.io/instance":   "ComponentCRName",
+		"app.kubernetes.io/part-of":    applicationName,
+		"app.kubernetes.io/managed-by": "kustomize",
+		"app.kubernetes.io/created-by": "GitOps Generator Test",
 	}
+	k8slabels := map[string]string{
+		"app.kubernetes.io/name":       componentName,
+		"app.kubernetes.io/instance":   componentName,
+		"app.kubernetes.io/part-of":    applicationName,
+		"app.kubernetes.io/managed-by": "kustomize",
+		"app.kubernetes.io/created-by": "application-service",
+	}
+	implementationSpecific := networkingv1.PathTypeImplementationSpecific
+
+	tests := []struct {
+		name        string
+		options     gitopsv1alpha1.GeneratorOptions
+		wantIngress networkingv1.Ingress
+	}{
+		{
+			name: "Simple options object",
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				Route:       componentName + ".example.com",
+			},
+			wantIngress: networkingv1.Ingress{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "Ingress",
+					APIVersion: "networking.k8s.io/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      componentName,
+					Namespace: namespace,
+					Labels:    k8slabels,
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/",
+											PathType: &implementationSpecific,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: componentName,
+													Port: networkingv1.ServiceBackendPort{
+														Number: 5000,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Host: componentName + ".example.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Options object with custom k8s labels set",
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				K8sLabels:   customK8sLabels,
+				Route:       componentName + ".example.com",
+			},
+			wantIngress: networkingv1.Ingress{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "Ingress",
+					APIVersion: "networking.k8s.io/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      componentName,
+					Namespace: namespace,
+					Labels:    customK8sLabels,
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/",
+											PathType: &implementationSpecific,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: componentName,
+													Port: networkingv1.ServiceBackendPort{
+														Number: 5000,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Host: componentName + ".example.com",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generatedIngress := generateIngress(tt.options)
+			if len(generatedIngress.Name) > 30 {
+				t.Errorf("TestGenerateIngress() error: expected CR name of length 30, got %v", len(generatedIngress.Name))
+			}
+
+			if tt.name == "Generated ingress with trimmed CR name" {
+				trimmedComponentName := "some-longer-component-nam"
+				if !strings.Contains(generatedIngress.Name, trimmedComponentName) {
+					t.Errorf("TestGenerateRoute() error: expected component CR name to contain %v got %v", tt.wantIngress, generatedIngress)
+				}
+
+				tt.wantIngress.Name = generatedIngress.Name
+			}
+			if !reflect.DeepEqual(*generatedIngress, tt.wantIngress) {
+				t.Errorf("TestGenerateRoute() error: expected %v got %v", tt.wantIngress, *generatedIngress)
+			}
+		})
+	}
+}
+
+func TestGenerateOverlays(t *testing.T) {
+
 	imageName := "test-image"
 	namespace := "test-namespace"
 	containerName := "test-container"
 
 	fs := ioutils.NewMemoryFilesystem()
 	readOnlyFs := ioutils.NewReadOnlyFs()
+
+	route1 := routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "route1",
+		},
+	}
+	route2 := routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "route2",
+		},
+	}
+
+	ingress1 := networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ingress1",
+		},
+	}
+	ingress2 := networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ingress2",
+		},
+	}
 
 	// Prepopulate the fs with components
 	gitOpsFolder := "/tmp/gitops"
@@ -762,40 +924,127 @@ func TestGenerateOverlays(t *testing.T) {
 	tests := []struct {
 		name                        string
 		fs                          afero.Afero
+		options                     gitopsv1alpha1.GeneratorOptions
 		outputFolder                string
 		expectPatchEntries          int
 		componentGeneratedResources map[string][]string
 		wantErr                     string
 	}{
 		{
-			name:               "simple success case",
-			fs:                 fs,
+			name: "simple success case",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
 			outputFolder:       outputFolder,
 			expectPatchEntries: 1,
 			wantErr:            "",
 		},
 		{
-			name:               "existing kustomization file with custom patches",
-			fs:                 fs,
+			name: "simple success case on OpenShift with Routes",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Routes: []routev1.Route{
+						route1,
+						route2,
+					},
+					Ingresses: []networkingv1.Ingress{
+						ingress1,
+						ingress2,
+					},
+				},
+			},
+			outputFolder:       outputFolder,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "simple success case on OpenShift where Route is generated",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name:       "test-component",
+				TargetPort: 8080,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Ingresses: []networkingv1.Ingress{
+						ingress1,
+						ingress2,
+					},
+				},
+			},
+			outputFolder:       outputFolder,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "simple success case on Kuberntes with Ingresses",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					Routes: []routev1.Route{
+						route1,
+						route2,
+					},
+					Ingresses: []networkingv1.Ingress{
+						ingress1,
+						ingress2,
+					},
+				},
+				IsKubernetesCluster: true,
+			},
+			outputFolder:       outputFolder,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "simple success case on OpenShift where Ingress is generated",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name:                "test-component",
+				TargetPort:          8080,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{},
+				IsKubernetesCluster: true,
+			},
+			outputFolder:       outputFolder,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "existing kustomization file with custom patches",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
 			outputFolder:       outputFolderWithKustomizationFile,
 			expectPatchEntries: 3,
 			wantErr:            "",
 		},
 		{
-			name:         "read only fs",
-			fs:           readOnlyFs,
+			name: "read only fs",
+			fs:   readOnlyFs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
 			outputFolder: outputFolderWithKustomizationFile,
 			wantErr:      "failed to MkDirAll",
 		},
 		{
-			name:         "unmarshall error",
-			fs:           fs,
+			name: "unmarshall error",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
 			outputFolder: invalidKustomizationFileFolder,
 			wantErr:      " failed to unmarshal data: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal number into Go struct field Kustomization.resources",
 		},
 		{
-			name:         "genereated an additional patch",
-			fs:           fs,
+			name: "genereated an additional patch",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
 			outputFolder: outputFolderWithKustomizationFile,
 			componentGeneratedResources: map[string][]string{
 				"test-component": {
@@ -809,18 +1058,18 @@ func TestGenerateOverlays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, component, imageName, namespace, tt.componentGeneratedResources)
+			err := GenerateOverlays(tt.fs, gitOpsFolder, tt.outputFolder, tt.options, imageName, namespace, tt.componentGeneratedResources)
 
 			if !testutils.ErrorMatch(t, tt.wantErr, err) {
 				t.Errorf("unexpected error return value. Got %v", err)
 			}
 
 			if tt.wantErr == "" {
-				// Validate that the deployment.yaml preserve the container name
-				deploymentPatchFilepath := filepath.Join(tt.outputFolder, "deployment-patch.yaml")
+				// Validate that the deployment-patch.yaml preserve the container name
+				deploymentPatchFilepath := filepath.Join(tt.outputFolder, deploymentPatchFileName)
 				exists, err := tt.fs.Exists(deploymentPatchFilepath)
 				if err != nil {
-					t.Errorf("unexpected error checking if deployment file exists %v", err)
+					t.Errorf("unexpected error checking if deployment patch file exists %v", err)
 				}
 				if !exists {
 					t.Errorf("deployment file does not exist at path %v", deploymentPatchFilepath)
@@ -831,13 +1080,69 @@ func TestGenerateOverlays(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error reading deployment file")
 				}
-				yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
+				err = yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
+				if err != nil {
+					t.Errorf("unexpected error unmarshaling deployment patch file bytes")
+				}
 				if deployPatch.Spec.Template.Spec.Containers[0].Name != containerName {
 					t.Errorf("expected container name %v, got %v", containerName, deployPatch.Spec.Template.Spec.Containers[0].Name)
 				}
 
+				if tt.options.IsKubernetesCluster {
+					// Validate that the ingress.yaml got created successfully and contains the proper entries
+					ingressFilepath := filepath.Join(tt.outputFolder, ingressFileName)
+					exists, err = tt.fs.Exists(ingressFilepath)
+					if err != nil {
+						t.Errorf("unexpected error checking if ingress file exists %v", err)
+					}
+					if !exists && tt.options.TargetPort != 0 {
+						t.Errorf("ingress file does not exist at path %v", ingressFilepath)
+					} else if exists {
+						ingress := networkingv1.Ingress{}
+						ingressBytes, err := tt.fs.ReadFile(ingressFilepath)
+						if err != nil {
+							t.Errorf("unexpected error reading ingress file")
+						}
+						err = yaml.Unmarshal(ingressBytes, &ingress)
+						if err != nil {
+							t.Errorf("unexpected error unmarshaling ingress file bytes")
+						}
+						if len(tt.options.KubernetesResources.Ingresses) > 0 && ingress.Name != tt.options.KubernetesResources.Ingresses[0].Name {
+							t.Errorf("expected ingress name %v, got %v", tt.options.KubernetesResources.Ingresses[0].Name, ingress.Name)
+						} else if len(tt.options.KubernetesResources.Ingresses) == 0 && ingress.Name != tt.options.Name {
+							t.Errorf("expected ingress name %v, got %v", tt.options.Name, ingress.Name)
+						}
+					}
+
+				} else {
+					// Validate that the route.yaml got created successfully and contains the proper entries
+					routeFilepath := filepath.Join(tt.outputFolder, routeFileName)
+					exists, err = tt.fs.Exists(routeFilepath)
+					if err != nil {
+						t.Errorf("unexpected error checking if route file exists %v", err)
+					}
+					if !exists && tt.options.TargetPort != 0 {
+						t.Errorf("route file does not exist at path %v", routeFilepath)
+					} else if exists {
+						route := routev1.Route{}
+						routeBytes, err := tt.fs.ReadFile(routeFilepath)
+						if err != nil {
+							t.Errorf("unexpected error reading route file")
+						}
+						err = yaml.Unmarshal(routeBytes, &route)
+						if err != nil {
+							t.Errorf("unexpected error unmarshaling route file bytes")
+						}
+						if len(tt.options.KubernetesResources.Routes) > 0 && route.Name != tt.options.KubernetesResources.Routes[0].Name {
+							t.Errorf("expected route name %v, got %v", tt.options.KubernetesResources.Routes[0].Name, route.Name)
+						} else if len(tt.options.KubernetesResources.Routes) == 0 && route.Name != tt.options.Name {
+							t.Errorf("expected route name %v, got %v", tt.options.Name, route.Name)
+						}
+					}
+				}
+
 				// Validate that the kustomization.yaml got created successfully and contains the proper entries
-				kustomizationFilepath := filepath.Join(tt.outputFolder, "kustomization.yaml")
+				kustomizationFilepath := filepath.Join(tt.outputFolder, kustomizeFileName)
 				exists, err = tt.fs.Exists(kustomizationFilepath)
 				if err != nil {
 					t.Errorf("unexpected error checking if kustomize file exists %v", err)
@@ -852,8 +1157,10 @@ func TestGenerateOverlays(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error reading parent kustomize file")
 				}
-				yaml.Unmarshal(kustomizationBytes, &k)
-
+				err = yaml.Unmarshal(kustomizationBytes, &k)
+				if err != nil {
+					t.Errorf("unexpected error unmarshaling file")
+				}
 				// There match patch entries in the kustomization file
 				if len(k.Patches) != tt.expectPatchEntries {
 					t.Errorf("expected %v kustomization bases, got %v patches: %v", tt.expectPatchEntries, len(k.Patches), k.Patches)
@@ -937,7 +1244,6 @@ func TestGenerate(t *testing.T) {
 	others2 := []interface{}{
 		pod1,
 		deployment2,
-		ingress1,
 		ingress2,
 	}
 
@@ -1018,13 +1324,12 @@ func TestGenerate(t *testing.T) {
 				kustomizeFileName: resources.Kustomization{
 					APIVersion: "kustomize.config.k8s.io/v1beta1",
 					Kind:       "Kustomization",
-					Resources:  []string{deploymentFileName, routeFileName},
+					Resources:  []string{deploymentFileName},
 				},
-				"route.yaml": route1,
 			},
 		},
 		{
-			name: "Single deployment object provided only, with Target Port should generate svc and route too",
+			name: "Single deployment object provided only, with Target Port should generate svc",
 			fs:   fs,
 			component: gitopsv1alpha1.GeneratorOptions{
 				Name:        componentName,
@@ -1038,12 +1343,11 @@ func TestGenerate(t *testing.T) {
 				TargetPort: 1234,
 			},
 			isServicetGenerated: true,
-			isRouteGenerated:    true,
 			wantFiles: map[string]interface{}{
 				kustomizeFileName: resources.Kustomization{
 					APIVersion: "kustomize.config.k8s.io/v1beta1",
 					Kind:       "Kustomization",
-					Resources:  []string{deploymentFileName, routeFileName, serviceFileName},
+					Resources:  []string{deploymentFileName, serviceFileName},
 				},
 				deploymentFileName: deployment1,
 			},
@@ -1076,11 +1380,10 @@ func TestGenerate(t *testing.T) {
 				kustomizeFileName: resources.Kustomization{
 					APIVersion: "kustomize.config.k8s.io/v1beta1",
 					Kind:       "Kustomization",
-					Resources:  []string{deploymentFileName, otherFileName, routeFileName, serviceFileName},
+					Resources:  []string{deploymentFileName, otherFileName, serviceFileName},
 				},
 				deploymentFileName: deployment1,
 				serviceFileName:    service1,
-				routeFileName:      route1,
 				otherFileName:      others1,
 			},
 		},

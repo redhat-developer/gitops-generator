@@ -328,6 +328,7 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 	repoPath := filepath.Join(outputPath, applicationName)
 
 	if clone {
+		s.Log.V(6).Info("Cloning the GitOps repository")
 		if out, err := execute(outputPath, GitCommand, "clone", remote, applicationName); err != nil {
 			return &GitCmdError{path: outputPath, cmdResult: string(out), err: err, cmdType: cloneRepo}
 		}
@@ -343,11 +344,14 @@ func (s Gen) GenerateOverlaysAndPush(outputPath string, clone bool, remote strin
 	// Generate the gitops resources and update the parent kustomize yaml file
 	gitopsFolder := filepath.Join(repoPath, context)
 	componentEnvOverlaysPath := filepath.Join(gitopsFolder, "components", componentName, "overlays", environmentName)
+
+	s.Log.V(6).Info("Generating the overlays resources")
 	if err := GenerateOverlays(appFs, gitopsFolder, componentEnvOverlaysPath, options, imageName, namespace, componentGeneratedResources); err != nil {
 		return &GitGenResourcesAndOverlaysError{path: componentEnvOverlaysPath, componentName: componentName, err: err, cmdType: genOverlays}
 	}
 
 	if doPush {
+		s.Log.V(6).Info("Committing and pushing the overlays resources")
 		return s.CommitAndPush(outputPath, applicationName, remote, componentName, branch, fmt.Sprintf("Generate %s environment overlays for component %s", environmentName, componentName))
 	}
 	return nil
