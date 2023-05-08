@@ -1159,7 +1159,7 @@ func TestGenerateOverlays(t *testing.T) {
 
 				if tt.options.IsKubernetesCluster {
 					// Validate that the ingress.yaml got created successfully and contains the proper entries
-					ingressFilepath := filepath.Join(tt.outputFolder, "ingress.yaml")
+					ingressFilepath := filepath.Join(tt.outputFolder, ingressFileName)
 					exists, err = tt.fs.Exists(ingressFilepath)
 					if err != nil {
 						t.Errorf("unexpected error checking if ingress file exists %v", err)
@@ -1187,7 +1187,7 @@ func TestGenerateOverlays(t *testing.T) {
 
 				if !tt.options.IsKubernetesCluster {
 					// Validate that the route.yaml got created successfully and contains the proper entries
-					routeFilepath := filepath.Join(tt.outputFolder, "route.yaml")
+					routeFilepath := filepath.Join(tt.outputFolder, routeFileName)
 					exists, err = tt.fs.Exists(routeFilepath)
 					if err != nil {
 						t.Errorf("unexpected error checking if ingress file exists %v", err)
