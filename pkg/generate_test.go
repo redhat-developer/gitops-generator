@@ -652,6 +652,44 @@ func TestGenerateRoute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Component object with custom route name set",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				TargetPort:  5000,
+				K8sLabels:   customK8sLabels,
+				Route:       "example.com",
+				RouteName:   "my-route-name",
+			},
+			wantRoute: routev1.Route{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "Route",
+					APIVersion: "route.openshift.io/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "my-route-name",
+					Namespace: namespace,
+					Labels:    customK8sLabels,
+				},
+				Spec: routev1.RouteSpec{
+					Host: "example.com",
+					Port: &routev1.RoutePort{
+						TargetPort: intstr.FromInt(5000),
+					},
+					TLS: &routev1.TLSConfig{
+						InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+						Termination:                   routev1.TLSTerminationEdge,
+					},
+					To: routev1.RouteTargetReference{
+						Kind:   "Service",
+						Name:   componentName,
+						Weight: &weight,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
