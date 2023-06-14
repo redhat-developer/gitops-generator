@@ -71,8 +71,12 @@ type GeneratorOptions struct {
 	// The port to expose the component over. Referenced in generated service.yaml and route.yaml
 	TargetPort int `json:"targetPort,omitempty"`
 
-	// The route to expose the component with. Referenced in generated route.yaml
+	// The route host name to expose the component with. Referenced in generated route.yaml
 	Route string `json:"route,omitempty"`
+
+	// The name of the route to be generated. If empty, the Component name will be used. Referenced in route.yaml
+	// Should be under 30 characters, if over, it will be trimmed to ensure compatibility with generated hostnames
+	RouteName string `json:"routeName,omitempty"`
 
 	// An array of environment variables to add to the component.  BaseEnvVar describes environment variables to use for the component
 	BaseEnvVar []corev1.EnvVar `json:"env,omitempty"`

@@ -489,12 +489,21 @@ func generateIngress(options gitopsv1alpha1.GeneratorOptions) *networkingv1.Ingr
 }
 
 func generateRoute(options gitopsv1alpha1.GeneratorOptions) *routev1.Route {
+
+	// If a specific Route name was passed in, use it, otherwise use the Component's name
+	var routeName string
+	if options.RouteName != "" {
+		routeName = options.RouteName
+	} else {
+		routeName = options.Name
+
+	}
 	// Trim the generated route name to under 30 characters (plus a few random characters for uniqueness)
 	// To ensure issues where the generated hostname (componentName-namespace) is too long
-	routeName := options.Name
 	if len(routeName) >= 30 {
 		routeName = routeName[0:25] + util.GetRandomString(4, true)
 	}
+
 	k8sLabels := generateK8sLabels(options)
 	weight := int32(100)
 	route := routev1.Route{
