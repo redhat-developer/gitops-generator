@@ -27,8 +27,13 @@ type Kustomization struct {
 	Kind         string            `json:"kind,omitempty"`
 	Resources    []string          `json:"resources,omitempty"`
 	Bases        []string          `json:"bases,omitempty"`
-	Patches      []string          `json:"patches,omitempty"`
+	Patches      []Patch           `json:"patches,omitempty"`
 	CommonLabels map[string]string `json:"commonLabels,omitempty"`
+}
+
+// Patch holds the patch information
+type Patch struct {
+	Path string `json:"path"`
 }
 
 func (k *Kustomization) AddResources(s ...string) {
@@ -40,7 +45,8 @@ func (k *Kustomization) AddBases(s ...string) {
 }
 
 func (k *Kustomization) AddPatches(s ...string) {
-	k.Patches = removeDuplicatesAndSort(append(k.Patches, s...))
+	files := removeDuplicatesAndSort(append(getPatchFiles(k.Patches), s...))
+	k.Patches = addFilestoPatches(files)
 }
 
 func removeDuplicatesAndSort(s []string) []string {
@@ -56,12 +62,11 @@ func removeDuplicatesAndSort(s []string) []string {
 	return out
 }
 
-func (k *Kustomization) CompareDifferenceAndAddCustomPatches(original []string, generated []string) {
-	newPatchesList := original
+func (k *Kustomization) CompareDifferenceAndAddCustomPatches(original []Patch, generated []string) {
 	newGeneratedFiles := []string{}
 	originalPatches := make(map[string]bool)
 	for _, originalElement := range original {
-		originalPatches[originalElement] = true
+		originalPatches[originalElement.Path] = true
 	}
 	for _, generatedElement := range generated {
 		if _, ok := originalPatches[generatedElement]; !ok {
@@ -70,6 +75,24 @@ func (k *Kustomization) CompareDifferenceAndAddCustomPatches(original []string, 
 		}
 	}
 	// new generated files should add to the top of the patch list
-	newPatchesList = append(newGeneratedFiles, newPatchesList...)
-	k.Patches = newPatchesList
+	newPatchesList := append(newGeneratedFiles, getPatchFiles(original)...)
+	k.Patches = addFilestoPatches(newPatchesList)
+}
+
+// gets the files from Patch
+func getPatchFiles(patches []Patch) []string {
+	var files []string
+	for _, patch := range patches {
+		files = append(files, patch.Path)
+	}
+	return files
+}
+
+// adds the files to Patch
+func addFilestoPatches(files []string) []Patch {
+	var patches []Patch
+	for _, file := range files {
+		patches = append(patches, Patch{Path: file})
+	}
+	return patches
 }

@@ -933,7 +933,14 @@ func TestGenerateOverlays(t *testing.T) {
 	fs.MkdirAll(outputFolderWithKustomizationFile, 0755)
 	preExistKustomizationFilepath := filepath.Join(outputFolderWithKustomizationFile, "kustomization.yaml")
 	k := resources.Kustomization{
-		Patches: []string{"patch1.yaml", "custom-patch1.yaml"},
+		Patches: []resources.Patch{
+			{
+				Path: "patch1.yaml",
+			},
+			{
+				Path: "custom-patch1.yaml",
+			},
+		},
 	}
 	bytes, err = yaml.Marshal(k)
 	if err != nil {

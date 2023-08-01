@@ -44,7 +44,7 @@ func Test_AddPatches(t *testing.T) {
 	k := Kustomization{}
 	k.AddPatches("testing.yaml", "testing2.yaml")
 
-	if diff := cmp.Diff([]string{"testing.yaml", "testing2.yaml"}, k.Patches); diff != "" {
+	if diff := cmp.Diff([]string{"testing.yaml", "testing2.yaml"}, getPatchFiles(k.Patches)); diff != "" {
 		t.Fatalf("failed to add resources:\n%s", diff)
 	}
 }
@@ -70,10 +70,69 @@ func Test_AddResource_sorts_elements(t *testing.T) {
 
 func Test_CompareDifferenceAndAddCustomizedPatches(t *testing.T) {
 	k := Kustomization{}
-	original := []string{"testing.yaml", "testing2.yaml", "custom.yaml", "custom2.yaml"}
+	original := []Patch{
+		{
+			Path: "testing.yaml",
+		},
+		{
+			Path: "testing2.yaml",
+		},
+		{
+			Path: "custom.yaml",
+		},
+		{
+			Path: "custom2.yaml",
+		},
+	}
 	generated := []string{"testing.yaml", "testing2.yaml", "testing3.yaml"}
 	k.CompareDifferenceAndAddCustomPatches(original, generated)
-	if diff := cmp.Diff([]string{"testing3.yaml", "testing.yaml", "testing2.yaml", "custom.yaml", "custom2.yaml"}, k.Patches); diff != "" {
+	if diff := cmp.Diff([]string{"testing3.yaml", "testing.yaml", "testing2.yaml", "custom.yaml", "custom2.yaml"}, getPatchFiles(k.Patches)); diff != "" {
 		t.Fatalf("failed to add customized patches:\n%s", diff)
+	}
+}
+
+func Test_GetPatchFiles(t *testing.T) {
+
+	original := []Patch{
+		{
+			Path: "testing.yaml",
+		},
+		{
+			Path: "testing2.yaml",
+		},
+		{
+			Path: "custom.yaml",
+		},
+		{
+			Path: "custom2.yaml",
+		},
+	}
+	want := []string{"testing.yaml", "testing2.yaml", "custom.yaml", "custom2.yaml"}
+	got := getPatchFiles(original)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("failed to get patch files:\n%s", diff)
+	}
+}
+
+func Test_AddFilestoPatches(t *testing.T) {
+
+	want := []Patch{
+		{
+			Path: "testing.yaml",
+		},
+		{
+			Path: "testing2.yaml",
+		},
+		{
+			Path: "custom.yaml",
+		},
+		{
+			Path: "custom2.yaml",
+		},
+	}
+	files := []string{"testing.yaml", "testing2.yaml", "custom.yaml", "custom2.yaml"}
+	got := addFilestoPatches(files)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("failed to add patch files:\n%s", diff)
 	}
 }
