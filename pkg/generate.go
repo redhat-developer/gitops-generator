@@ -225,14 +225,6 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		if len(originalDeploymentContent.Spec.Template.Spec.Containers) > 0 {
 			containerName = originalDeploymentContent.Spec.Template.Spec.Containers[0].Name
 		}
-
-		deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
-
-		resources[deploymentPatchFileName] = deploymentPatch
-
-		k.AddResources("../../base")
-		k.AddPatches(deploymentPatchFileName)
-		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
 	} else if StatefulSetExist {
 		err = yaml.UnMarshalItemFromFile(fs, baseStatefulSetFilePath, &originalStatefulSetContent)
 		if err != nil {
@@ -269,6 +261,17 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], daemonsetPatchFileName)
 	}
 
+	// Generate the deployment patch file
+	// If the StatefulSet or DaemonSet file exists already in the base, don't generate the patch file
+	if !StatefulSetExist && !DaemonSetExist {
+		deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
+
+		resources[deploymentPatchFileName] = deploymentPatch
+
+		k.AddResources("../../base")
+		k.AddPatches(deploymentPatchFileName)
+		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
+	}
 	var route *routev1.Route
 	var ingress *networkingv1.Ingress
 
