@@ -409,6 +409,201 @@ func TestGenerateDeploymentPatch(t *testing.T) {
 	}
 }
 
+func TestGenerateStatefulSetPatch(t *testing.T) {
+	componentName := "test-component"
+	namespace := "test-namespace"
+	containerName := "test-container"
+	replicas := int32(1)
+	image := "image"
+
+	tests := []struct {
+		name            string
+		component       gitopsv1alpha1.GeneratorOptions
+		containerName   string
+		imageName       string
+		namespace       string
+		wantStatefulSet appsv1.StatefulSet
+	}{
+		{
+			name: "Simple component, no optional fields set",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:     componentName,
+				Replicas: int(replicas),
+				BaseEnvVar: []corev1.EnvVar{
+					{
+						Name:  "FOO",
+						Value: "BAR",
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("1"),
+					},
+				},
+				OverlayEnvVar: []corev1.EnvVar{
+					{
+						Name:  "FOO",
+						Value: "BAR_ENV",
+					},
+					{
+						Name:  "FOO2",
+						Value: "BAR2_ENV",
+					},
+				},
+			},
+			namespace:     namespace,
+			imageName:     image,
+			containerName: containerName,
+			wantStatefulSet: appsv1.StatefulSet{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "StatefulSet",
+					APIVersion: "apps/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      componentName,
+					Namespace: namespace,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: &replicas,
+					Selector: &v1.LabelSelector{},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  containerName,
+									Image: image,
+									Env: []corev1.EnvVar{
+										{
+											Name:  "FOO",
+											Value: "BAR",
+										},
+										{
+											Name:  "FOO2",
+											Value: "BAR2_ENV",
+										},
+									},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU: resource.MustParse("1"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generatedStatefulSet := generateStatefulSetPatch(tt.component, tt.imageName, tt.containerName, tt.namespace)
+
+			if !reflect.DeepEqual(*generatedStatefulSet, tt.wantStatefulSet) {
+				t.Errorf("TestGenerateStatefulSetPatch() error: expected %v got %v", tt.wantStatefulSet, *generatedStatefulSet)
+			}
+		})
+	}
+}
+
+func TestGenerateDaemonSetPatch(t *testing.T) {
+	componentName := "test-component"
+	namespace := "test-namespace"
+	containerName := "test-container"
+	replicas := int32(1)
+	image := "image"
+
+	tests := []struct {
+		name          string
+		component     gitopsv1alpha1.GeneratorOptions
+		containerName string
+		imageName     string
+		namespace     string
+		wantDaemonSet appsv1.DaemonSet
+	}{
+		{
+			name: "Simple component, no optional fields set",
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:     componentName,
+				Replicas: int(replicas),
+				BaseEnvVar: []corev1.EnvVar{
+					{
+						Name:  "FOO",
+						Value: "BAR",
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("1"),
+					},
+				},
+				OverlayEnvVar: []corev1.EnvVar{
+					{
+						Name:  "FOO",
+						Value: "BAR_ENV",
+					},
+					{
+						Name:  "FOO2",
+						Value: "BAR2_ENV",
+					},
+				},
+			},
+			namespace:     namespace,
+			imageName:     image,
+			containerName: containerName,
+			wantDaemonSet: appsv1.DaemonSet{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "DaemonSet",
+					APIVersion: "apps/v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      componentName,
+					Namespace: namespace,
+				},
+				Spec: appsv1.DaemonSetSpec{
+					Selector: &v1.LabelSelector{},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  containerName,
+									Image: image,
+									Env: []corev1.EnvVar{
+										{
+											Name:  "FOO",
+											Value: "BAR",
+										},
+										{
+											Name:  "FOO2",
+											Value: "BAR2_ENV",
+										},
+									},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU: resource.MustParse("1"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generatedDaemonSet := generateDaemonSetPatch(tt.component, tt.imageName, tt.containerName, tt.namespace)
+
+			if !reflect.DeepEqual(*generatedDaemonSet, tt.wantDaemonSet) {
+				t.Errorf("TestGenerateDaemonSetPatch() error: expected %v got %v", tt.wantDaemonSet, *generatedDaemonSet)
+			}
+		})
+	}
+}
+
 func TestGenerateService(t *testing.T) {
 	applicationName := "test-application"
 	componentName := "test-component"
@@ -966,6 +1161,88 @@ func TestGenerateOverlays(t *testing.T) {
 		t.Errorf("unexpected error when writing to kustomizatipn file: %v", err)
 	}
 
+	gitOpsFolder2 := "/tmp/statefulset"
+	fs.MkdirAll(gitOpsFolder2, 0755)
+	baseFolder2 := filepath.Join(gitOpsFolder2, "base")
+	fs.MkdirAll(baseFolder2, 0755)
+	baseStatefulSetFilePath := filepath.Join(baseFolder2, "statefulset.yaml")
+	baseStatefulSet := appsv1.StatefulSet{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test-component",
+			Namespace: namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &v1.LabelSelector{},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  containerName,
+							Image: imageName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bytes, err = yaml.Marshal(baseStatefulSet)
+	if err != nil {
+		t.Errorf("unexpected error when marshal the base statefulset yaml %v", err)
+	}
+	err = fs.WriteFile(baseStatefulSetFilePath, bytes, 0755)
+	if err != nil {
+		t.Errorf("unexpected error when writing to base statefulset file: %v", err)
+	}
+
+	outputFolder2 := filepath.Join(gitOpsFolder2, "overlays", "development")
+	fs.MkdirAll(outputFolder2, 0755)
+
+	gitOpsFolder3 := "/tmp/daemonset"
+	fs.MkdirAll(gitOpsFolder2, 0755)
+	baseFolder3 := filepath.Join(gitOpsFolder3, "base")
+	fs.MkdirAll(baseFolder2, 0755)
+	baseDaemonSetFilePath := filepath.Join(baseFolder3, "daemonset.yaml")
+	baseDaemonSet := appsv1.DaemonSet{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test-component",
+			Namespace: namespace,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &v1.LabelSelector{},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  containerName,
+							Image: imageName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bytes, err = yaml.Marshal(baseDaemonSet)
+	if err != nil {
+		t.Errorf("unexpected error when marshal the base daemonset yaml %v", err)
+	}
+	err = fs.WriteFile(baseDaemonSetFilePath, bytes, 0755)
+	if err != nil {
+		t.Errorf("unexpected error when writing to base daemonset file: %v", err)
+	}
+
+	outputFolder3 := filepath.Join(gitOpsFolder3, "overlays", "development")
+	fs.MkdirAll(outputFolder3, 0755)
+
 	tests := []struct {
 		name                        string
 		fs                          afero.Afero
@@ -982,6 +1259,26 @@ func TestGenerateOverlays(t *testing.T) {
 				Name: "test-component",
 			},
 			outputFolder:       outputFolder,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "simple success case with statefulset",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
+			outputFolder:       outputFolder2,
+			expectPatchEntries: 1,
+			wantErr:            "",
+		},
+		{
+			name: "simple success case with daemonset",
+			fs:   fs,
+			options: gitopsv1alpha1.GeneratorOptions{
+				Name: "test-component",
+			},
+			outputFolder:       outputFolder3,
 			expectPatchEntries: 1,
 			wantErr:            "",
 		},
@@ -1109,28 +1406,77 @@ func TestGenerateOverlays(t *testing.T) {
 				t.Errorf("unexpected error return value. Got %v", err)
 			}
 
+			var exists bool
 			if tt.wantErr == "" {
-				// Validate that the deployment-patch.yaml preserve the container name
-				deploymentPatchFilepath := filepath.Join(tt.outputFolder, deploymentPatchFileName)
-				exists, err := tt.fs.Exists(deploymentPatchFilepath)
-				if err != nil {
-					t.Errorf("unexpected error checking if deployment patch file exists %v", err)
-				}
-				if !exists {
-					t.Errorf("deployment file does not exist at path %v", deploymentPatchFilepath)
-				}
+				if strings.Contains(tt.name, "statefulset") {
+					// Validate that the statefulset-patch.yaml preserve the container name
+					statefulSetPatchFilepath := filepath.Join(tt.outputFolder, statefulsetPatchFileName)
+					exists, err := tt.fs.Exists(statefulSetPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error checking if statefulset patch file exists %v", err)
+					}
+					if !exists {
+						t.Errorf("statefulset file does not exist at path %v", statefulSetPatchFilepath)
+					}
 
-				deployPatch := appsv1.Deployment{}
-				deploymentPatchBytes, err := tt.fs.ReadFile(deploymentPatchFilepath)
-				if err != nil {
-					t.Errorf("unexpected error reading deployment file")
-				}
-				err = yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
-				if err != nil {
-					t.Errorf("unexpected error unmarshaling deployment patch file bytes")
-				}
-				if deployPatch.Spec.Template.Spec.Containers[0].Name != containerName {
-					t.Errorf("expected container name %v, got %v", containerName, deployPatch.Spec.Template.Spec.Containers[0].Name)
+					statefulSetPatch := appsv1.StatefulSet{}
+					statefulSetPatchBytes, err := tt.fs.ReadFile(statefulSetPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error reading statefulset file")
+					}
+					err = yaml.Unmarshal(statefulSetPatchBytes, &statefulSetPatch)
+					if err != nil {
+						t.Errorf("unexpected error unmarshaling statefulset patch file bytes")
+					}
+					if statefulSetPatch.Spec.Template.Spec.Containers[0].Name != containerName {
+						t.Errorf("expected container name %v, got %v", containerName, statefulSetPatch.Spec.Template.Spec.Containers[0].Name)
+					}
+				} else if strings.Contains(tt.name, "daemonset") {
+					// Validate that the daemonset-patch.yaml preserve the container name
+					daemonSetPatchFilepath := filepath.Join(tt.outputFolder, daemonsetPatchFileName)
+					exists, err := tt.fs.Exists(daemonSetPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error checking if daemonset patch file exists %v", err)
+					}
+					if !exists {
+						t.Errorf("daemonset file does not exist at path %v", daemonSetPatchFilepath)
+					}
+
+					daemonSetPatch := appsv1.DaemonSet{}
+					daemonSetPatchBytes, err := tt.fs.ReadFile(daemonSetPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error reading daemonset file")
+					}
+					err = yaml.Unmarshal(daemonSetPatchBytes, &daemonSetPatch)
+					if err != nil {
+						t.Errorf("unexpected error unmarshaling daemonset patch file bytes")
+					}
+					if daemonSetPatch.Spec.Template.Spec.Containers[0].Name != containerName {
+						t.Errorf("expected container name %v, got %v", containerName, daemonSetPatch.Spec.Template.Spec.Containers[0].Name)
+					}
+				} else {
+					// Validate that the deployment-patch.yaml preserve the container name
+					deploymentPatchFilepath := filepath.Join(tt.outputFolder, deploymentPatchFileName)
+					exists, err := tt.fs.Exists(deploymentPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error checking if deployment patch file exists %v", err)
+					}
+					if !exists {
+						t.Errorf("deployment file does not exist at path %v", deploymentPatchFilepath)
+					}
+
+					deployPatch := appsv1.Deployment{}
+					deploymentPatchBytes, err := tt.fs.ReadFile(deploymentPatchFilepath)
+					if err != nil {
+						t.Errorf("unexpected error reading deployment file")
+					}
+					err = yaml.Unmarshal(deploymentPatchBytes, &deployPatch)
+					if err != nil {
+						t.Errorf("unexpected error unmarshaling deployment patch file bytes")
+					}
+					if deployPatch.Spec.Template.Spec.Containers[0].Name != containerName {
+						t.Errorf("expected container name %v, got %v", containerName, deployPatch.Spec.Template.Spec.Containers[0].Name)
+					}
 				}
 
 				if tt.options.IsKubernetesCluster {
@@ -1241,6 +1587,30 @@ func TestGenerate(t *testing.T) {
 		},
 	}
 
+	statefulSet1 := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "statefulset1",
+		},
+	}
+
+	statefulSet2 := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "statefulset2",
+		},
+	}
+
+	daemonSet1 := appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "daemonset1",
+		},
+	}
+
+	daemonSet2 := appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "daemonset2",
+		},
+	}
+
 	service1 := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service1",
@@ -1292,6 +1662,18 @@ func TestGenerate(t *testing.T) {
 		ingress2,
 	}
 
+	others3 := []interface{}{
+		statefulSet2,
+		service2,
+		route2,
+	}
+
+	others4 := []interface{}{
+		daemonSet2,
+		service2,
+		route2,
+	}
+
 	fs := ioutils.NewFilesystem()
 
 	tests := []struct {
@@ -1326,6 +1708,50 @@ func TestGenerate(t *testing.T) {
 					Resources:  []string{deploymentFileName},
 				},
 				deploymentFileName: deployment1,
+			},
+		},
+		{
+			name: "Single statefulset object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					StatefulSets: []appsv1.StatefulSet{
+						statefulSet1,
+					},
+				},
+			},
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{statefulsetFileName},
+				},
+				statefulsetFileName: statefulSet1,
+			},
+		},
+		{
+			name: "Single daemonset object provided only",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					DaemonSets: []appsv1.DaemonSet{
+						daemonSet1,
+					},
+				},
+			},
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{daemonsetFileName},
+				},
+				daemonsetFileName: daemonSet1,
 			},
 		},
 		{
@@ -1430,6 +1856,76 @@ func TestGenerate(t *testing.T) {
 				deploymentFileName: deployment1,
 				serviceFileName:    service1,
 				otherFileName:      others1,
+			},
+		},
+		{
+			name: "Multiple statefulsets, service and route provided",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					StatefulSets: []appsv1.StatefulSet{
+						statefulSet1,
+						statefulSet2,
+					},
+					Services: []corev1.Service{
+						service1,
+						service2,
+					},
+					Routes: []routev1.Route{
+						route1,
+						route2,
+					},
+				},
+				TargetPort: 1234,
+			},
+			isSerializeRequired: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{otherFileName, serviceFileName, statefulsetFileName},
+				},
+				statefulsetFileName: statefulSet1,
+				serviceFileName:     service1,
+				otherFileName:       others3,
+			},
+		},
+		{
+			name: "Multiple daemonsets, service and route provided",
+			fs:   fs,
+			component: gitopsv1alpha1.GeneratorOptions{
+				Name:        componentName,
+				Namespace:   namespace,
+				Application: applicationName,
+				KubernetesResources: gitopsv1alpha1.KubernetesResources{
+					DaemonSets: []appsv1.DaemonSet{
+						daemonSet1,
+						daemonSet2,
+					},
+					Services: []corev1.Service{
+						service1,
+						service2,
+					},
+					Routes: []routev1.Route{
+						route1,
+						route2,
+					},
+				},
+				TargetPort: 1234,
+			},
+			isSerializeRequired: true,
+			wantFiles: map[string]interface{}{
+				kustomizeFileName: resources.Kustomization{
+					APIVersion: "kustomize.config.k8s.io/v1beta1",
+					Kind:       "Kustomization",
+					Resources:  []string{daemonsetFileName, otherFileName, serviceFileName},
+				},
+				daemonsetFileName: daemonSet1,
+				serviceFileName:   service1,
+				otherFileName:     others4,
 			},
 		},
 		{

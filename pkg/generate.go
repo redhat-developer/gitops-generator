@@ -35,13 +35,17 @@ import (
 )
 
 const (
-	kustomizeFileName       = "kustomization.yaml"
-	deploymentFileName      = "deployment.yaml"
-	deploymentPatchFileName = "deployment-patch.yaml"
-	ingressFileName         = "ingress.yaml"
-	routeFileName           = "route.yaml"
-	serviceFileName         = "service.yaml"
-	otherFileName           = "other_resources.yaml"
+	kustomizeFileName        = "kustomization.yaml"
+	deploymentFileName       = "deployment.yaml"
+	deploymentPatchFileName  = "deployment-patch.yaml"
+	statefulsetFileName      = "statefulset.yaml"
+	statefulsetPatchFileName = "statefulset-patch.yaml"
+	daemonsetFileName        = "daemonset.yaml"
+	daemonsetPatchFileName   = "daemonset-patch.yaml"
+	ingressFileName          = "ingress.yaml"
+	routeFileName            = "route.yaml"
+	serviceFileName          = "service.yaml"
+	otherFileName            = "other_resources.yaml"
 )
 
 var CreatedBy = "application-service"
@@ -51,7 +55,10 @@ var CreatedBy = "application-service"
 func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, options gitopsv1alpha1.GeneratorOptions) error {
 
 	var deployment *appsv1.Deployment
-	if len(options.KubernetesResources.Deployments) == 0 {
+	var statefulSet *appsv1.StatefulSet
+	var daemonSet *appsv1.DaemonSet
+
+	if len(options.KubernetesResources.Deployments) == 0 && len(options.KubernetesResources.StatefulSets) == 0 && len(options.KubernetesResources.DaemonSets) == 0 {
 		deployment = generateDeployment(options)
 	} else if len(options.KubernetesResources.Deployments) > 0 {
 		deployment, options.KubernetesResources.Deployments = &options.KubernetesResources.Deployments[0], options.KubernetesResources.Deployments[1:]
@@ -61,15 +68,38 @@ func Generate(fs afero.Afero, gitOpsFolder string, outputFolder string, options 
 		}
 
 		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherDeployments...)
+	} else if len(options.KubernetesResources.StatefulSets) > 0 {
+		statefulSet, options.KubernetesResources.StatefulSets = &options.KubernetesResources.StatefulSets[0], options.KubernetesResources.StatefulSets[1:]
+		var otherStatefulSets []interface{}
+		for _, statefulSet := range options.KubernetesResources.StatefulSets {
+			otherStatefulSets = append(otherStatefulSets, statefulSet)
+		}
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherStatefulSets...)
+	} else if len(options.KubernetesResources.DaemonSets) > 0 {
+		daemonSet, options.KubernetesResources.DaemonSets = &options.KubernetesResources.DaemonSets[0], options.KubernetesResources.DaemonSets[1:]
+		var otherDaemonSets []interface{}
+		for _, daemonSet := range options.KubernetesResources.DaemonSets {
+			otherDaemonSets = append(otherDaemonSets, daemonSet)
+		}
+		options.KubernetesResources.Others = append(options.KubernetesResources.Others, otherDaemonSets...)
 	}
 
 	k := resources.Kustomization{
 		APIVersion: "kustomize.config.k8s.io/v1beta1",
 		Kind:       "Kustomization",
 	}
-	k.AddResources(deploymentFileName)
-	resources := map[string]interface{}{
-		deploymentFileName: deployment,
+
+	// Add deployment or statefulset yaml to the kustomize file
+	resources := make(map[string]interface{})
+	if deployment != nil {
+		k.AddResources(deploymentFileName)
+		resources[deploymentFileName] = deployment
+	} else if statefulSet != nil {
+		k.AddResources(statefulsetFileName)
+		resources[statefulsetFileName] = statefulSet
+	} else if daemonSet != nil {
+		k.AddResources(daemonsetFileName)
+		resources[daemonsetFileName] = daemonSet
 	}
 
 	var service *corev1.Service
@@ -164,12 +194,28 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 	}
 
 	var originalDeploymentContent appsv1.Deployment
+	var originalStatefulSetContent appsv1.StatefulSet
+	var originalDaemonSetContent appsv1.DaemonSet
 	baseDeploymentFilePath := filepath.Join(outputFolder, "../../base/", deploymentFileName)
 	DeploymentFileExist, err := fs.Exists(baseDeploymentFilePath)
-	containerName := "container-image"
 	if err != nil {
 		return err
 	}
+
+	baseStatefulSetFilePath := filepath.Join(outputFolder, "../../base/", statefulsetFileName)
+	StatefulSetExist, err := fs.Exists(baseStatefulSetFilePath)
+	if err != nil {
+		return err
+	}
+
+	baseDaemonSetFilePath := filepath.Join(outputFolder, "../../base/", daemonsetFileName)
+	DaemonSetExist, err := fs.Exists(baseDaemonSetFilePath)
+	if err != nil {
+		return err
+	}
+	containerName := "container-image"
+
+	resources := make(map[string]interface{})
 	if DeploymentFileExist {
 		err = yaml.UnMarshalItemFromFile(fs, baseDeploymentFilePath, &originalDeploymentContent)
 		if err != nil {
@@ -179,17 +225,49 @@ func GenerateOverlays(fs afero.Afero, gitOpsFolder string, outputFolder string, 
 		if len(originalDeploymentContent.Spec.Template.Spec.Containers) > 0 {
 			containerName = originalDeploymentContent.Spec.Template.Spec.Containers[0].Name
 		}
+
+		deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
+
+		resources[deploymentPatchFileName] = deploymentPatch
+
+		k.AddResources("../../base")
+		k.AddPatches(deploymentPatchFileName)
+		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
+	} else if StatefulSetExist {
+		err = yaml.UnMarshalItemFromFile(fs, baseStatefulSetFilePath, &originalStatefulSetContent)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal items from %q: %v", baseStatefulSetFilePath, err)
+		}
+
+		if len(originalStatefulSetContent.Spec.Template.Spec.Containers) > 0 {
+			containerName = originalStatefulSetContent.Spec.Template.Spec.Containers[0].Name
+		}
+
+		statefulSetPatch := generateStatefulSetPatch(options, imageName, containerName, namespace)
+
+		resources[statefulsetPatchFileName] = statefulSetPatch
+
+		k.AddResources("../../base")
+		k.AddPatches(statefulsetPatchFileName)
+		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], statefulsetPatchFileName)
+	} else if DaemonSetExist {
+		err = yaml.UnMarshalItemFromFile(fs, baseDaemonSetFilePath, &originalDaemonSetContent)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal items from %q: %v", baseDaemonSetFilePath, err)
+		}
+
+		if len(originalDaemonSetContent.Spec.Template.Spec.Containers) > 0 {
+			containerName = originalDaemonSetContent.Spec.Template.Spec.Containers[0].Name
+		}
+
+		daemonSetPatch := generateDaemonSetPatch(options, imageName, containerName, namespace)
+
+		resources[daemonsetPatchFileName] = daemonSetPatch
+
+		k.AddResources("../../base")
+		k.AddPatches(daemonsetPatchFileName)
+		componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], daemonsetPatchFileName)
 	}
-
-	deploymentPatch := generateDeploymentPatch(options, imageName, containerName, namespace)
-
-	resources := map[string]interface{}{
-		deploymentPatchFileName: deploymentPatch,
-	}
-
-	k.AddResources("../../base")
-	k.AddPatches(deploymentPatchFileName)
-	componentGeneratedResources[options.Name] = append(componentGeneratedResources[options.Name], deploymentPatchFileName)
 
 	var route *routev1.Route
 	var ingress *networkingv1.Ingress
@@ -409,6 +487,123 @@ func generateDeploymentPatch(options gitopsv1alpha1.GeneratorOptions, imageName,
 	deployment.Spec.Template.Spec.Containers[0].Resources = options.Resources
 
 	return &deployment
+}
+
+func generateStatefulSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, containerName, namespace string) *appsv1.StatefulSet {
+
+	statefulSet := appsv1.StatefulSet{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      options.Name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &v1.LabelSelector{},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  containerName,
+							Image: imageName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, env := range options.BaseEnvVar {
+		statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
+
+	// only add the environment env configurations, if a deployment/binding env is not present with the same env name
+	for _, env := range options.OverlayEnvVar {
+		isPresent := false
+		for _, statefulSetEnv := range statefulSet.Spec.Template.Spec.Containers[0].Env {
+			if statefulSetEnv.Name == env.Name {
+				isPresent = true
+				break
+			}
+		}
+
+		if !isPresent {
+			statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+				Name:  env.Name,
+				Value: env.Value,
+			})
+		}
+	}
+
+	if options.Replicas > 0 {
+		replica := int32(options.Replicas)
+		statefulSet.Spec.Replicas = &replica
+	}
+
+	statefulSet.Spec.Template.Spec.Containers[0].Resources = options.Resources
+
+	return &statefulSet
+}
+
+func generateDaemonSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, containerName, namespace string) *appsv1.DaemonSet {
+
+	statefulSet := appsv1.DaemonSet{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      options.Name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &v1.LabelSelector{},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  containerName,
+							Image: imageName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, env := range options.BaseEnvVar {
+		statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
+
+	// only add the environment env configurations, if a deployment/binding env is not present with the same env name
+	for _, env := range options.OverlayEnvVar {
+		isPresent := false
+		for _, statefulSetEnv := range statefulSet.Spec.Template.Spec.Containers[0].Env {
+			if statefulSetEnv.Name == env.Name {
+				isPresent = true
+				break
+			}
+		}
+
+		if !isPresent {
+			statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+				Name:  env.Name,
+				Value: env.Value,
+			})
+		}
+	}
+
+	statefulSet.Spec.Template.Spec.Containers[0].Resources = options.Resources
+
+	return &statefulSet
 }
 
 func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
