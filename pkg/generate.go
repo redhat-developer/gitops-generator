@@ -555,7 +555,7 @@ func generateStatefulSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName
 
 func generateDaemonSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, containerName, namespace string) *appsv1.DaemonSet {
 
-	statefulSet := appsv1.DaemonSet{
+	daemonSet := appsv1.DaemonSet{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: "apps/v1",
