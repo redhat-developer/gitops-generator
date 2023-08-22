@@ -580,7 +580,7 @@ func generateDaemonSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, 
 	}
 
 	for _, env := range options.BaseEnvVar {
-		statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+		daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,
 		})
@@ -589,7 +589,7 @@ func generateDaemonSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, 
 	// only add the environment env configurations, if a deployment/binding env is not present with the same env name
 	for _, env := range options.OverlayEnvVar {
 		isPresent := false
-		for _, statefulSetEnv := range statefulSet.Spec.Template.Spec.Containers[0].Env {
+		for _, statefulSetEnv := range daemonSet.Spec.Template.Spec.Containers[0].Env {
 			if statefulSetEnv.Name == env.Name {
 				isPresent = true
 				break
@@ -597,16 +597,16 @@ func generateDaemonSetPatch(options gitopsv1alpha1.GeneratorOptions, imageName, 
 		}
 
 		if !isPresent {
-			statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 				Name:  env.Name,
 				Value: env.Value,
 			})
 		}
 	}
 
-	statefulSet.Spec.Template.Spec.Containers[0].Resources = options.Resources
+	daemonSet.Spec.Template.Spec.Containers[0].Resources = options.Resources
 
-	return &statefulSet
+	return &daemonSet
 }
 
 func generateService(options gitopsv1alpha1.GeneratorOptions) *corev1.Service {
