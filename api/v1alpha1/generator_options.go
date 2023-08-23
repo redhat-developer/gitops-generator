@@ -31,11 +31,13 @@ type GitSource struct {
 
 // KubernetesResources define the list of Kubernetes resources
 type KubernetesResources struct {
-	Deployments []appsv1.Deployment
-	Services    []corev1.Service
-	Routes      []routev1.Route
-	Ingresses   []networkingv1.Ingress
-	Others      []interface{}
+	DaemonSets   []appsv1.DaemonSet
+	Deployments  []appsv1.Deployment
+	StatefulSets []appsv1.StatefulSet
+	Services     []corev1.Service
+	Routes       []routev1.Route
+	Ingresses    []networkingv1.Ingress
+	Others       []interface{}
 }
 
 // GeneratorOptions - This captures the options for generating the component's GitOps resources for a component of an
